@@ -1,2 +1,118 @@
-# my-adventure-route
+# My Adventure Route
 
+MVP SaaS route planner for motorcycles and 4x4 vehicles with adventure-oriented routing preferences.
+
+## What is included
+- `apps/web`: React + Vite SPA (landing, auth, planner form, results shell with MapLibre)
+- `apps/api`: NestJS REST API + Prisma + JWT auth
+- `packages/contracts`: Shared Zod contracts and DTO types
+- `packages/scoring`: Pluggable route scoring model (curvature, road class, surface, difficulty)
+- `infra/docker-compose.yml`: Postgres + GraphHopper services
+
+## Prerequisites
+- Node.js 20+
+- pnpm 10+
+- Docker + Docker Compose
+
+## Quick start
+1. Install dependencies:
+   ```bash
+   pnpm install
+   ```
+2. Copy environment files:
+   ```bash
+   cp apps/api/.env.example apps/api/.env
+   cp apps/web/.env.example apps/web/.env
+   ```
+3. Download default OSM extract (Vermont):
+   ```bash
+   pnpm fetch:osm
+   ```
+4. Start infra services:
+   ```bash
+   pnpm docker:up
+   ```
+5. Generate Prisma client and run migrations:
+   ```bash
+   pnpm --filter @adventure/api prisma:generate
+   pnpm db:migrate
+   ```
+6. Optional seed user:
+   ```bash
+   pnpm db:seed
+   ```
+7. Start web + api + package watchers:
+   ```bash
+   pnpm dev
+   ```
+
+Web: http://localhost:5173
+
+API health: http://localhost:3001/api/health
+
+Note: in local development, the web app uses Vite proxy (`/api` -> `http://localhost:3001`) to avoid CORS issues.
+
+## Default credentials from seed
+- Email: `demo@adventureroute.dev`
+- Password: `password123`
+
+## Key API endpoints
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/health`
+- `POST /api/routes/plan` (auth required)
+- `GET /api/routes/:id` (auth required)
+
+## Notes on routing provider
+`apps/api/.env` controls provider selection:
+- `ROUTING_PROVIDER=mock` for fast local development
+- `ROUTING_PROVIDER=graphhopper` to call local GraphHopper
+- Optional `CORS_ORIGINS` can be set to a comma-separated allowlist for non-local frontend origins.
+
+The system always returns 3 ranked routes. If GraphHopper fails or returns fewer options, it falls back to mock alternatives.
+
+## TODOs for real routing quality
+- Map sliders to GraphHopper `custom_model` settings.
+- Improve alternative-route generation diversity and quality.
+- Add region switching and periodic OSM import refreshes.
+
+## Testing
+Run all tests:
+```bash
+pnpm test
+```
+
+Run API only:
+```bash
+pnpm --filter @adventure/api test
+```
+
+Run web only:
+```bash
+pnpm --filter @adventure/web test
+```
+
+## Troubleshooting
+- If GraphHopper fails on startup, ensure `infra/data/osm/vermont-latest.osm.pbf` exists.
+- If you see `Couldn't load from existing folder: /data/default-gh ... DataReader wasn't specified`, your container started without `--input`; use the repo compose config (it now passes `--input` and `--graph-cache` explicitly for `israelhikingmap/graphhopper`).
+- GraphHopper surface path details require `surface` in encoded values. For `israelhikingmap/graphhopper`, this is set via `JAVA_OPTS` Dropwizard override:
+  - `-Ddw.graphhopper.graph.encoded_values=road_class,road_environment,max_speed,road_access,surface,car_access,car_average_speed`
+- If an older broken cache exists, remove it and restart:
+  ```bash
+  rm -rf infra/data/graphhopper/*
+  pnpm docker:down
+  pnpm docker:up
+  ```
+- If surface still appears missing, force a full graph rebuild (this is required when encoded values change):
+  ```bash
+  pnpm docker:down
+  rm -rf infra/data/graphhopper/adventure-vt-gh
+  pnpm docker:up
+  ```
+- Optional validation after rebuild:
+  - Check `infra/data/graphhopper/adventure-vt-gh/properties.txt` contains `surface` under `graph.encoded_values`.
+- First GraphHopper import can take several minutes; subsequent runs should be faster due to cache.
+- If Prisma migration fails, verify Postgres is running on `localhost:5432`.
+
+## Development roadmap
+See [docs/roadmap.md](docs/roadmap.md).
