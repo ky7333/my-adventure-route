@@ -382,4 +382,60 @@ describe('GraphHopperRoutingProvider', () => {
     expect(requestUrl.searchParams.get('algorithm')).toBe('round_trip');
     expect(requestUrl.searchParams.getAll('point')).toHaveLength(1);
   });
+
+  it('maps vehicle type to a profile-specific GraphHopper profile per request', async () => {
+    const configService = {
+      get: vi.fn((key: string, fallback: string) => {
+        const map: Record<string, string> = {
+          GRAPHHOPPER_BASE_URL: 'http://localhost:8989',
+          GRAPHHOPPER_PROFILE: 'car',
+          GRAPHHOPPER_PROFILE_MOTORCYCLE: 'motorcycle',
+          GRAPHHOPPER_PROFILE_ADV_MOTORCYCLE: 'car',
+          GRAPHHOPPER_PROFILE_4X4: 'small_truck',
+          GRAPHHOPPER_API_KEY: ''
+        };
+        return map[key] ?? fallback;
+      })
+    } as unknown as ConfigService;
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          paths: [
+            {
+              distance: 50000,
+              time: 3600000,
+              points: {
+                coordinates: [
+                  [-72.7, 44.4],
+                  [-72.4, 44.6]
+                ]
+              }
+            }
+          ]
+        }),
+        { status: 200 }
+      )
+    );
+
+    const provider = new GraphHopperRoutingProvider(configService);
+    provider.setHttpFetchForTesting(fetchMock as unknown as typeof fetch);
+
+    await provider.planCandidates({
+      start: { label: 'A', lat: 44.4, lng: -72.7 },
+      end: { label: 'B', lat: 44.6, lng: -72.4 },
+      loopRide: false,
+      vehicleType: '4x4',
+      preferences: {
+        curvy: 50,
+        scenic: 50,
+        avoidHighways: 50,
+        unpavedPreference: 50,
+        difficulty: 50
+      }
+    });
+
+    const requestUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(requestUrl.searchParams.get('profile')).toBe('small_truck');
+  });
 });

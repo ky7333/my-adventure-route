@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { planRouteRequestSchema, planRouteResponseSchema, routeSurfaceSectionSchema } from './index';
+import {
+  planRouteRequestSchema,
+  planRouteResponseSchema,
+  routeSurfaceSectionSchema,
+  surfaceMixSchema
+} from './index';
 
 describe('planRouteRequestSchema', () => {
   it('rejects point-to-point route without end location', () => {
@@ -19,11 +24,42 @@ describe('planRouteRequestSchema', () => {
     expect(parsed.success).toBe(false);
   });
 
+  it('rejects loop routes when end is provided', () => {
+    const parsed = planRouteRequestSchema.safeParse({
+      start: { label: 'A', lat: 44.4, lng: -72.7 },
+      end: { label: 'B', lat: 44.5, lng: -72.6 },
+      loopRide: true,
+      vehicleType: 'motorcycle',
+      preferences: {
+        curvy: 50,
+        scenic: 50,
+        avoidHighways: 50,
+        unpavedPreference: 50,
+        difficulty: 50
+      }
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
   it('rejects surface sections where startCoordinateIndex is greater than or equal to endCoordinateIndex', () => {
     const parsed = routeSurfaceSectionSchema.safeParse({
       startCoordinateIndex: 2,
       endCoordinateIndex: 2,
       surface: 'gravel'
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe('surfaceMixSchema', () => {
+  it('rejects surface mixes that do not sum to 100', () => {
+    const parsed = surfaceMixSchema.safeParse({
+      pavedPercent: 40,
+      gravelPercent: 40,
+      dirtPercent: 0,
+      unknownPercent: 0
     });
 
     expect(parsed.success).toBe(false);

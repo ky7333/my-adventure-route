@@ -35,6 +35,14 @@ export const planRouteRequestSchema = z
         path: ['end']
       });
     }
+
+    if (data.loopRide && data.end !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'end must be omitted when loopRide is true',
+        path: ['end']
+      });
+    }
   });
 export type PlanRouteRequest = z.infer<typeof planRouteRequestSchema>;
 
@@ -52,6 +60,20 @@ export const surfaceMixSchema = z.object({
   gravelPercent: z.number().min(0).max(100),
   dirtPercent: z.number().min(0).max(100),
   unknownPercent: z.number().min(0).max(100)
+}).superRefine((surfaceMix, ctx) => {
+  const total =
+    surfaceMix.pavedPercent +
+    surfaceMix.gravelPercent +
+    surfaceMix.dirtPercent +
+    surfaceMix.unknownPercent;
+
+  if (Math.abs(total - 100) > 1e-6) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'surfaceMix percentages must sum to 100',
+      path: ['unknownPercent']
+    });
+  }
 });
 export type SurfaceMix = z.infer<typeof surfaceMixSchema>;
 

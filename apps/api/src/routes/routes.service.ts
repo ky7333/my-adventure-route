@@ -72,7 +72,7 @@ function normalizeSurfaceMix(surfaceMix: SurfaceMix): SurfaceMix {
   const total = raw.paved + raw.gravel + raw.dirt + raw.unknown;
 
   if (total <= 0) {
-    return { pavedPercent: 100, gravelPercent: 0, dirtPercent: 0, unknownPercent: 0 };
+    return { pavedPercent: 0, gravelPercent: 0, dirtPercent: 0, unknownPercent: 100 };
   }
 
   return roundSurfacePercents({

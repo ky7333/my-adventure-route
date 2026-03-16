@@ -340,9 +340,31 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
     this.httpFetch = httpFetch;
   }
 
+  private mapVehicleTypeToProfile(vehicleType: PlanRouteRequest['vehicleType']): string {
+    const resolveProfile = (configuredProfile: string | undefined): string => {
+      const candidate = configuredProfile?.trim() || this.profile;
+      if (!candidate) {
+        throw new Error(`No GraphHopper profile configured for vehicleType "${vehicleType}"`);
+      }
+      return candidate;
+    };
+
+    switch (vehicleType) {
+      case 'motorcycle':
+        return resolveProfile(this.configService.get<string>('GRAPHHOPPER_PROFILE_MOTORCYCLE', this.profile));
+      case 'adv_motorcycle':
+        return resolveProfile(this.configService.get<string>('GRAPHHOPPER_PROFILE_ADV_MOTORCYCLE', this.profile));
+      case '4x4':
+        return resolveProfile(this.configService.get<string>('GRAPHHOPPER_PROFILE_4X4', this.profile));
+      default:
+        throw new Error(`Unsupported vehicleType for GraphHopper profile mapping: ${vehicleType}`);
+    }
+  }
+
   async planCandidates(input: PlanRouteRequest): Promise<RawRouteCandidate[]> {
     const isLoopRequest = input.loopRide || !input.end;
     const endPoint = input.end ?? input.start;
+    const profile = this.mapVehicleTypeToProfile(input.vehicleType);
 
     const detailStrategies: string[][] = [
       ['surface', 'road_class'],
@@ -356,7 +378,7 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
 
     for (const details of detailStrategies) {
       const query = new URLSearchParams({
-        profile: this.profile,
+        profile,
         points_encoded: 'false',
         instructions: 'false',
         'ch.disable': 'true'
@@ -457,7 +479,7 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
         segments,
         providerMeta: {
           provider: 'graphhopper',
-          profile: this.profile,
+          profile,
           source: sourceUrl.toString(),
           hasSurfaceDetails: Boolean(path.details?.surface?.length),
           // TODO: map sliders to GraphHopper custom_model for route personalization.
