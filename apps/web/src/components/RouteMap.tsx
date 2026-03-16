@@ -6,6 +6,12 @@ import type { RouteAlternative, RouteSurfaceSection, RouteSurfaceType } from '@a
 interface RouteMapProps {
   options: RouteAlternative[];
   selectedRouteId: string | null;
+  fitPadding?: {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  };
 }
 
 const SURFACE_COLORS: Record<RouteSurfaceType, string> = {
@@ -128,11 +134,19 @@ function buildSurfaceFeatures(option: RouteAlternative) {
   };
 }
 
-export function RouteMap({ options, selectedRouteId }: RouteMapProps) {
+const DEFAULT_FIT_PADDING = {
+  top: 40,
+  right: 40,
+  bottom: 40,
+  left: 40
+};
+
+export function RouteMap({ options, selectedRouteId, fitPadding }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const maplibreRef = useRef<MapLibreGlobal | null>(null);
   const lastFittedRouteIdRef = useRef<string | null>(null);
+  const lastFitPaddingKeyRef = useRef<string | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
 
   useEffect(() => {
@@ -227,6 +241,7 @@ export function RouteMap({ options, selectedRouteId }: RouteMapProps) {
           (surfaceSource as GeoJSONSource).setData(emptyFeatureCollection as any);
         }
         lastFittedRouteIdRef.current = null;
+        lastFitPaddingKeyRef.current = null;
         retryCount = 0;
       };
 
@@ -319,13 +334,16 @@ export function RouteMap({ options, selectedRouteId }: RouteMapProps) {
 
       retryCount = 0;
 
-      if (lastFittedRouteIdRef.current !== selected.id) {
+      const resolvedFitPadding = fitPadding ?? DEFAULT_FIT_PADDING;
+      const fitPaddingKey = `${resolvedFitPadding.top}:${resolvedFitPadding.right}:${resolvedFitPadding.bottom}:${resolvedFitPadding.left}`;
+      if (lastFittedRouteIdRef.current !== selected.id || lastFitPaddingKeyRef.current !== fitPaddingKey) {
         const bounds = new maplibre.LngLatBounds();
         selected.geometry.coordinates.forEach(([lng, lat]) => {
           bounds.extend([lng, lat]);
         });
-        map.fitBounds(bounds, { padding: 40, duration: 300 });
+        map.fitBounds(bounds, { padding: resolvedFitPadding, duration: 300 });
         lastFittedRouteIdRef.current = selected.id;
+        lastFitPaddingKeyRef.current = fitPaddingKey;
       }
     };
 
@@ -362,7 +380,7 @@ export function RouteMap({ options, selectedRouteId }: RouteMapProps) {
       map.off('load', renderSelectedRoute);
       map.off('styledata', renderSelectedRoute);
     };
-  }, [options, selectedRouteId, isMapReady]);
+  }, [options, selectedRouteId, isMapReady, fitPadding]);
 
   return (
     <div className="route-map-shell">

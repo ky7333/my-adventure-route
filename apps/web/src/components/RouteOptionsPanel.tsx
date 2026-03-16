@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react';
 import type { RouteAlternative } from '@adventure/contracts';
 
 interface RouteOptionsPanelProps {
@@ -6,32 +7,82 @@ interface RouteOptionsPanelProps {
   onSelect: (routeId: string) => void;
 }
 
+const surfacePillDefinitions = [
+  { key: 'pavedPercent', label: 'Paved', className: 'surface-pill-paved' },
+  { key: 'gravelPercent', label: 'Gravel', className: 'surface-pill-gravel' },
+  { key: 'dirtPercent', label: 'Dirt', className: 'surface-pill-dirt' },
+  { key: 'unknownPercent', label: 'Unknown', className: 'surface-pill-unknown' }
+] as const;
+
 export function RouteOptionsPanel({
   options,
   selectedRouteId,
   onSelect
 }: RouteOptionsPanelProps) {
+  const handleRadioKeyDown = (event: KeyboardEvent<HTMLButtonElement>, routeId: string): void => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onSelect(routeId);
+    }
+  };
+
   return (
     <section className="results-panel">
-      <h2>Route Options</h2>
-      <div className="route-options-grid">
+      <div className="results-panel-header">
+        <h2>Route Options</h2>
+        <span className="route-count-pill">{options.length} choices</span>
+      </div>
+      <div className="route-segmented" role="radiogroup" aria-label="Choose route">
         {options.map((option) => (
           <button
-            key={option.id}
+            key={`${option.id}-chip`}
             type="button"
-            className={`route-card ${selectedRouteId === option.id ? 'active' : ''}`}
+            role="radio"
+            aria-checked={selectedRouteId === option.id}
+            className={`route-chip ${selectedRouteId === option.id ? 'active' : ''}`}
             onClick={() => onSelect(option.id)}
           >
-            <div className="route-card-title">#{option.rank} {option.label}</div>
-            <div>{option.distanceKm.toFixed(1)} km</div>
-            <div>{option.durationMin.toFixed(0)} min</div>
-            <div>Twistiness: {option.twistinessScore.toFixed(0)}</div>
-            <div>
-              Surface mix: paved {option.surfaceMix.pavedPercent}% / gravel {option.surfaceMix.gravelPercent}%
-              {' '} / dirt {option.surfaceMix.dirtPercent}% / unknown {option.surfaceMix.unknownPercent}%
-            </div>
+            <span className="route-chip-rank">Route {option.rank}</span>
+            <span className="route-chip-time">{option.durationMin.toFixed(0)} min</span>
           </button>
         ))}
+      </div>
+      <div className="route-options-grid" role="radiogroup" aria-label="Choose route details">
+        {options.map((option) => {
+          const surfacePills = surfacePillDefinitions.filter(
+            (surface) => option.surfaceMix[surface.key] > 0
+          );
+
+          return (
+            <button
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={selectedRouteId === option.id}
+              tabIndex={selectedRouteId === option.id ? 0 : -1}
+              className={`route-card ${selectedRouteId === option.id ? 'active' : ''}`}
+              onClick={() => onSelect(option.id)}
+              onKeyDown={(event) => handleRadioKeyDown(event, option.id)}
+            >
+              <div className="route-card-head">
+                <div className="route-card-title">#{option.rank} {option.label}</div>
+                <span className="route-card-time">{option.durationMin.toFixed(0)} min</span>
+              </div>
+              <div className="route-quick-stats">
+                <span>{option.distanceKm.toFixed(1)} km</span>
+                <span>Twistiness: {option.twistinessScore.toFixed(0)}</span>
+                <span>Difficulty: {option.difficultyScore.toFixed(0)}</span>
+              </div>
+              <div className="route-surface-pills">
+                {surfacePills.map((surface) => (
+                  <span key={surface.key} className={`surface-pill ${surface.className}`}>
+                    {surface.label} {option.surfaceMix[surface.key]}%
+                  </span>
+                ))}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </section>
   );

@@ -51,6 +51,7 @@ Web: http://localhost:5173
 API health: http://localhost:3001/api/health
 
 Note: in local development, the web app uses Vite proxy (`/api` -> `http://localhost:3001`) to avoid CORS issues.
+For production API runtime, use `pnpm --filter @adventure/api start:prod` (or run `node dist/main.js` directly).
 
 ## Default credentials from seed
 - Email: `demo@adventureroute.dev`
