@@ -1,9 +1,10 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useMatch, useNavigate } from 'react-router-dom';
 import type { PropsWithChildren } from 'react';
 import { clearAccessToken, isAuthenticated } from '../lib/auth';
 
 export function AppLayout({ children }: PropsWithChildren) {
   const navigate = useNavigate();
+  const isMapResultsPage = useMatch('/results/:routeRequestId') !== null;
 
   const handleLogout = (): void => {
     clearAccessToken();
@@ -11,8 +12,8 @@ export function AppLayout({ children }: PropsWithChildren) {
   };
 
   return (
-    <div className="app-shell">
-      <header className="site-header">
+    <div className={`app-shell ${isMapResultsPage ? 'app-shell--map' : ''}`}>
+      <header className={`site-header ${isMapResultsPage ? 'site-header--map' : ''}`}>
         <Link to="/" className="brand">
           Adventure Route
         </Link>
@@ -30,7 +31,9 @@ export function AppLayout({ children }: PropsWithChildren) {
           )}
         </nav>
       </header>
-      <main className="page-container">{children}</main>
+      <main className={`page-container ${isMapResultsPage ? 'page-container--map' : ''}`}>
+        {children}
+      </main>
     </div>
   );
 }
