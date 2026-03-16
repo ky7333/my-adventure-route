@@ -120,7 +120,7 @@ export function ResultsPage() {
       resizeObserver.disconnect();
       window.removeEventListener('resize', updateFitPadding);
     };
-  }, [routeDetail?.routeRequestId]);
+  }, [routeDetail]);
 
   if (error) {
     return <p className="form-error">{error}</p>;

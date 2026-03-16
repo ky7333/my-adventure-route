@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react';
 import type { RouteAlternative } from '@adventure/contracts';
 
 interface RouteOptionsPanelProps {
@@ -18,6 +19,13 @@ export function RouteOptionsPanel({
   selectedRouteId,
   onSelect
 }: RouteOptionsPanelProps) {
+  const handleRadioKeyDown = (event: KeyboardEvent<HTMLButtonElement>, routeId: string): void => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onSelect(routeId);
+    }
+  };
+
   return (
     <section className="results-panel">
       <div className="results-panel-header">
@@ -39,7 +47,7 @@ export function RouteOptionsPanel({
           </button>
         ))}
       </div>
-      <div className="route-options-grid">
+      <div className="route-options-grid" role="radiogroup" aria-label="Choose route details">
         {options.map((option) => {
           const surfacePills = surfacePillDefinitions.filter(
             (surface) => option.surfaceMix[surface.key] > 0
@@ -49,8 +57,12 @@ export function RouteOptionsPanel({
             <button
               key={option.id}
               type="button"
+              role="radio"
+              aria-checked={selectedRouteId === option.id}
+              tabIndex={selectedRouteId === option.id ? 0 : -1}
               className={`route-card ${selectedRouteId === option.id ? 'active' : ''}`}
               onClick={() => onSelect(option.id)}
+              onKeyDown={(event) => handleRadioKeyDown(event, option.id)}
             >
               <div className="route-card-head">
                 <div className="route-card-title">#{option.rank} {option.label}</div>

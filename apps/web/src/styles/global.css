@@ -83,7 +83,7 @@ a {
 }
 
 .app-shell--map {
-  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -613,6 +613,7 @@ select {
   }
 
   .route-card,
+  .route-chip,
   .btn-primary,
   .btn-secondary {
     transition: none;
