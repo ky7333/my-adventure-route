@@ -1,0 +1,383 @@
+@font-face {
+  font-family: Manrope;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/manrope-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: Manrope;
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/manrope-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/space-grotesk-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/space-grotesk-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/space-grotesk-latin.woff2") format("woff2");
+}
+
+:root {
+  --bg: #f2efe6;
+  --bg-layer: #ffffffcc;
+  --text: #1c2b24;
+  --muted: #4b5d54;
+  --primary: #0a7f5a;
+  --primary-dark: #05563e;
+  --accent: #d46a38;
+  --border: #c8d0c7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Manrope, sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 20% 20%, #d6eadf 0%, transparent 35%),
+    radial-gradient(circle at 80% 0%, #f2d8b2 0%, transparent 35%),
+    var(--bg);
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Space Grotesk", sans-serif;
+  margin-top: 0;
+}
+
+a {
+  color: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  backdrop-filter: blur(6px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.brand {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-nav {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.site-nav a,
+.text-button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: none;
+}
+
+.site-nav a:focus-visible,
+.text-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.page-container {
+  width: min(1080px, calc(100vw - 2rem));
+  margin: 1rem auto 3rem;
+}
+
+.hero,
+.auth-card,
+.results-panel,
+.stats-strip,
+.planner-grid {
+  background: var(--bg-layer);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 10px 30px #00000010;
+}
+
+.hero {
+  display: grid;
+  gap: 0.9rem;
+  animation: rise-in 500ms ease-out;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.8rem;
+  color: var(--primary);
+}
+
+.lead,
+.muted {
+  color: var(--muted);
+}
+
+.hero-actions {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.btn-primary,
+.btn-secondary {
+  border-radius: 999px;
+  padding: 0.65rem 1.2rem;
+  border: 0;
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px #ffffffd9;
+}
+
+.btn-secondary {
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.auth-card {
+  width: min(480px, 100%);
+  margin: 0 auto;
+}
+
+.form-stack,
+.planner-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+input,
+select,
+button {
+  font: inherit;
+}
+
+label {
+  display: grid;
+  gap: 0.4rem;
+}
+
+input,
+select {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.58rem 0.65rem;
+  background: #fff;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-error {
+  color: #b6362a;
+  font-weight: 600;
+}
+
+.results-layout {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 1rem;
+}
+
+.map-column,
+.details-column {
+  display: grid;
+  gap: 1rem;
+}
+
+.route-map-shell {
+  position: relative;
+  min-height: 500px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.route-map {
+  height: 100%;
+  min-height: 500px;
+}
+
+.surface-legend {
+  position: absolute;
+  left: 0.8rem;
+  bottom: 0.8rem;
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  padding: 0.45rem 0.55rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.78rem;
+  backdrop-filter: blur(3px);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.legend-swatch {
+  width: 0.8rem;
+  height: 0.35rem;
+  border-radius: 999px;
+}
+
+.legend-paved {
+  background: #2e7d32;
+}
+
+.legend-gravel {
+  background: #b7791f;
+}
+
+.legend-dirt {
+  background: #8d4f2b;
+}
+
+.legend-unknown {
+  background: #6b7280;
+}
+
+.route-options-grid {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.route-card {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 12px;
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.3rem;
+  text-align: left;
+  transition: transform 150ms ease, border-color 150ms ease;
+}
+
+.route-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--primary);
+}
+
+.route-card:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--primary);
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.route-card.active {
+  border-color: var(--accent);
+}
+
+.route-card-title {
+  font-weight: 700;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero {
+    animation: none;
+  }
+
+  .route-card,
+  .btn-primary,
+  .btn-secondary {
+    transition: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .results-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .route-map-shell {
+    min-height: 360px;
+  }
+
+  .route-map {
+    min-height: 360px;
+  }
+
+  .site-header {
+    padding: 0.85rem 1rem;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .page-container {
+    width: calc(100vw - 1rem);
+  }
+}

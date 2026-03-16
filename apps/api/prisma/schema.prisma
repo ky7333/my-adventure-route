@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  routeRequests RouteRequest[]
+}
+
+model RouteRequest {
+  id          String        @id @default(cuid())
+  userId      String
+  startLabel  String
+  startLat    Float
+  startLng    Float
+  endLabel    String?
+  endLat      Float?
+  endLng      Float?
+  loopRide    Boolean       @default(false)
+  vehicleType String
+  preferences Json
+  createdAt   DateTime      @default(now())
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  options RouteOption[]
+
+  @@index([userId])
+}
+
+model RouteOption {
+  id              String   @id @default(cuid())
+  routeRequestId  String
+  rank            Int
+  label           String
+  distanceKm      Float
+  durationMin     Float
+  surfaceMix      Json
+  twistinessScore Float
+  difficultyScore Float
+  score           Json
+  geometry        Json
+  providerMeta    Json
+  createdAt       DateTime @default(now())
+
+  routeRequest RouteRequest @relation(fields: [routeRequestId], references: [id], onDelete: Cascade)
+
+  @@unique([routeRequestId, rank])
+}

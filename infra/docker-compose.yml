@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: adventure_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: adventure_route
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d adventure_route']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  graphhopper:
+    image: israelhikingmap/graphhopper:latest
+    container_name: adventure_graphhopper
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - '8989:8989'
+    volumes:
+      - ./data/graphhopper:/data
+      - ./data/osm:/data/osm
+    environment:
+      JAVA_OPTS: '-Xmx2g -Ddw.graphhopper.graph.encoded_values=road_class,road_environment,max_speed,road_access,surface,car_access,car_average_speed'
+    command:
+      - '--input'
+      - '/data/osm/vermont-latest.osm.pbf'
+      - '--graph-cache'
+      - '/data/adventure-vt-gh'
+      - '--host'
+      - '0.0.0.0'
+      - '--port'
+      - '8989'
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
