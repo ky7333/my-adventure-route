@@ -19,7 +19,11 @@ export const ROUTING_PROVIDER_TOKEN = Symbol('ROUTING_PROVIDER_TOKEN');
         graphHopperProvider: GraphHopperRoutingProvider,
         mockProvider: MockRoutingProvider
       ): RoutingProvider => {
-        const configuredProviderRaw = configService.get<string>('ROUTING_PROVIDER', 'mock') ?? 'mock';
+        const configuredProviderRaw = configService.get<string>('ROUTING_PROVIDER');
+        if (!configuredProviderRaw) {
+          throw new Error('ROUTING_PROVIDER must be set to "graphhopper" or "mock".');
+        }
+
         const configuredProvider = configuredProviderRaw.toLowerCase();
         if (configuredProvider === 'graphhopper') {
           return graphHopperProvider;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planRouteRequestSchema, routeSurfaceSectionSchema } from './index';
+import { planRouteRequestSchema, planRouteResponseSchema, routeSurfaceSectionSchema } from './index';
 
 describe('planRouteRequestSchema', () => {
   it('rejects point-to-point route without end location', () => {
@@ -19,11 +19,68 @@ describe('planRouteRequestSchema', () => {
     expect(parsed.success).toBe(false);
   });
 
-  it('rejects surface sections where startCoordinateIndex is greater than endCoordinateIndex', () => {
+  it('rejects surface sections where startCoordinateIndex is greater than or equal to endCoordinateIndex', () => {
     const parsed = routeSurfaceSectionSchema.safeParse({
-      startCoordinateIndex: 3,
+      startCoordinateIndex: 2,
       endCoordinateIndex: 2,
       surface: 'gravel'
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe('planRouteResponseSchema', () => {
+  const baseOption = {
+    id: 'opt-1',
+    rank: 1,
+    label: 'Option 1',
+    distanceKm: 10,
+    durationMin: 20,
+    twistinessScore: 65,
+    difficultyScore: 55,
+    surfaceMix: {
+      pavedPercent: 40,
+      gravelPercent: 30,
+      dirtPercent: 20,
+      unknownPercent: 10
+    },
+    score: {
+      curvature: 65,
+      roadClass: 60,
+      surface: 58,
+      difficulty: 55,
+      total: 60
+    },
+    geometry: {
+      type: 'LineString' as const,
+      coordinates: [
+        [-72.7, 44.4],
+        [-72.6, 44.5]
+      ]
+    }
+  };
+
+  it('accepts 1 to 3 route alternatives', () => {
+    const parsed = planRouteResponseSchema.safeParse({
+      routeRequestId: 'req-1',
+      generatedAt: new Date().toISOString(),
+      options: [baseOption]
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects more than 3 route alternatives', () => {
+    const parsed = planRouteResponseSchema.safeParse({
+      routeRequestId: 'req-1',
+      generatedAt: new Date().toISOString(),
+      options: [
+        baseOption,
+        { ...baseOption, id: 'opt-2', rank: 2 },
+        { ...baseOption, id: 'opt-3', rank: 3 },
+        { ...baseOption, id: 'opt-4', rank: 4 }
+      ]
     });
 
     expect(parsed.success).toBe(false);

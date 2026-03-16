@@ -201,6 +201,8 @@ export function RouteMap({ options, selectedRouteId }: RouteMapProps) {
 
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryCount = 0;
+    const MAX_RETRIES = 8;
 
     const renderSelectedRoute = (): void => {
       if (cancelled) {
@@ -225,6 +227,7 @@ export function RouteMap({ options, selectedRouteId }: RouteMapProps) {
           (surfaceSource as GeoJSONSource).setData(emptyFeatureCollection as any);
         }
         lastFittedRouteIdRef.current = null;
+        retryCount = 0;
       };
 
       const selected = options.find((option) => option.id === selectedRouteId) ?? options[0];
@@ -314,9 +317,13 @@ export function RouteMap({ options, selectedRouteId }: RouteMapProps) {
         return;
       }
 
+      retryCount = 0;
+
       if (lastFittedRouteIdRef.current !== selected.id) {
         const bounds = new maplibre.LngLatBounds();
-        selected.geometry.coordinates.forEach(([lng, lat]) => bounds.extend([lng, lat]));
+        selected.geometry.coordinates.forEach(([lng, lat]) => {
+          bounds.extend([lng, lat]);
+        });
         map.fitBounds(bounds, { padding: 40, duration: 300 });
         lastFittedRouteIdRef.current = selected.id;
       }
@@ -327,8 +334,18 @@ export function RouteMap({ options, selectedRouteId }: RouteMapProps) {
         return;
       }
 
+      if (retryCount >= MAX_RETRIES) {
+        console.warn('RouteMap: max render retries reached; aborting route render retries.');
+        return;
+      }
+
+      retryCount += 1;
+
       retryTimer = setTimeout(() => {
         retryTimer = null;
+        if (cancelled) {
+          return;
+        }
         renderSelectedRoute();
       }, 150);
     };
@@ -338,6 +355,7 @@ export function RouteMap({ options, selectedRouteId }: RouteMapProps) {
     map.on('styledata', renderSelectedRoute);
     return () => {
       cancelled = true;
+      retryCount = 0;
       if (retryTimer) {
         clearTimeout(retryTimer);
       }

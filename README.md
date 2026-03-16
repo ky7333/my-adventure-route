@@ -54,8 +54,8 @@ Note: in local development, the web app uses Vite proxy (`/api` -> `http://local
 
 ## Default credentials from seed
 - Email: `demo@adventureroute.dev`
-- Password: `password123` (when seeding with `SEED_DEMO_PASSWORD=password123`)
-Warning: local seed data only. Change or remove this account in any shared, staging, or production environment, and disable seed accounts in deployments by skipping `pnpm db:seed` outside local development.
+- Password: set `SEED_DEMO_PASSWORD=<YOUR_DEMO_PASSWORD>` before running `pnpm db:seed`
+Warning: local seed data only. Use a non-default password and remove or disable seed accounts in shared, staging, and production environments (for deployments, skip `pnpm db:seed`).
 
 ## Key API endpoints
 - `POST /api/auth/register`
@@ -70,7 +70,7 @@ Warning: local seed data only. Change or remove this account in any shared, stag
 - `ROUTING_PROVIDER=graphhopper` to call local GraphHopper
 - Optional `CORS_ORIGINS` can be set to a comma-separated allowlist for non-local frontend origins.
 
-The system always returns 3 ranked routes. If GraphHopper fails or returns fewer options, it falls back to mock alternatives.
+The system returns 1 to 3 ranked routes depending on provider availability.
 
 ## TODOs for real routing quality
 - Map sliders to GraphHopper `custom_model` settings.

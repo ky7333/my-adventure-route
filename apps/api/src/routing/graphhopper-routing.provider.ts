@@ -154,12 +154,16 @@ function extractHintStrings(hints: unknown): string[] {
     }
 
     if (Array.isArray(value)) {
-      value.forEach((item) => visit(item));
+      value.forEach((item) => {
+        visit(item);
+      });
       return;
     }
 
     if (value && typeof value === 'object') {
-      Object.values(value as Record<string, unknown>).forEach((item) => visit(item));
+      Object.values(value as Record<string, unknown>).forEach((item) => {
+        visit(item);
+      });
     }
   };
 
@@ -239,8 +243,7 @@ function parseDetailEntry(
 
 function buildSegmentsFromPathDetails(
   path: GraphHopperPath,
-  index: number,
-  difficultyPreference: number
+  index: number
 ): ScoreInputSegment[] {
   const coordinates = path.points?.coordinates ?? [];
   const edgeCount = Math.max(coordinates.length - 1, 1);
@@ -258,7 +261,7 @@ function buildSegmentsFromPathDetails(
           return parsed ? mapGraphHopperRoadClass(parsed.value) : 'tertiary';
         })(),
         surface: 'unknown',
-        technicalDifficulty: 30 + difficultyPreference / 3
+        technicalDifficulty: 30
       }
     ];
   }
@@ -298,7 +301,7 @@ function buildSegmentsFromPathDetails(
       curvature: 56 + index * 6 + curvatureBoost,
       roadClass,
       surface,
-      technicalDifficulty: 30 + difficultyPreference / 3 + surfaceDifficultyBoost
+      technicalDifficulty: 30 + surfaceDifficultyBoost
     });
   }
 
@@ -312,7 +315,7 @@ function buildSegmentsFromPathDetails(
       curvature: 58 + index * 6,
       roadClass: 'tertiary',
       surface: 'unknown',
-      technicalDifficulty: 30 + difficultyPreference / 3
+      technicalDifficulty: 30
     }
   ];
 }
@@ -384,7 +387,7 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
         query.set('key', this.apiKey);
       }
 
-      requestUrl = `${this.baseUrl}/${isLoopRequest ? 'trip' : 'route'}?${query.toString()}`;
+      requestUrl = `${this.baseUrl}/route?${query.toString()}`;
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10_000);
       let response: Response;
@@ -436,7 +439,7 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
         [input.start.lng, input.start.lat],
         [endPoint.lng, endPoint.lat]
       ];
-      const segments = buildSegmentsFromPathDetails(path, index, input.preferences.difficulty);
+      const segments = buildSegmentsFromPathDetails(path, index);
       const surfaceMix = buildSurfaceMixFromSegments(segments);
 
       const sourceUrl = new URL(requestUrl);

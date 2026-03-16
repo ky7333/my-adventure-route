@@ -2,6 +2,24 @@ import { describe, expect, it } from 'vitest';
 import { toPlanRoutePayload } from './planPayload';
 
 describe('toPlanRoutePayload', () => {
+  const baseValues = {
+    startLabel: 'Start',
+    startLat: '44.4',
+    startLng: '-72.7',
+    endLabel: 'End',
+    endLat: '44.8',
+    endLng: '-72.1',
+    loopRide: false,
+    vehicleType: '4x4' as const,
+    preferences: {
+      curvy: 60,
+      scenic: 65,
+      avoidHighways: 70,
+      unpavedPreference: 55,
+      difficulty: 55
+    }
+  };
+
   it('builds point-to-point payload', () => {
     const payload = toPlanRoutePayload({
       startLabel: 'Start',
@@ -50,22 +68,46 @@ describe('toPlanRoutePayload', () => {
   it('rejects blank coordinate strings', () => {
     expect(() =>
       toPlanRoutePayload({
-        startLabel: 'Start',
+        ...baseValues,
         startLat: '   ',
-        startLng: '-72.7',
-        endLabel: 'End',
-        endLat: '44.8',
-        endLng: '-72.1',
-        loopRide: false,
-        vehicleType: '4x4',
-        preferences: {
-          curvy: 60,
-          scenic: 65,
-          avoidHighways: 70,
-          unpavedPreference: 55,
-          difficulty: 55
-        }
+        startLng: '-72.7'
       })
     ).toThrow('startLat is required');
+  });
+
+  it('rejects blank startLng', () => {
+    expect(() =>
+      toPlanRoutePayload({
+        ...baseValues,
+        startLng: ' '
+      })
+    ).toThrow('startLng is required');
+  });
+
+  it('rejects blank endLat for point-to-point routes', () => {
+    expect(() =>
+      toPlanRoutePayload({
+        ...baseValues,
+        endLat: ' '
+      })
+    ).toThrow('endLat is required');
+  });
+
+  it('rejects blank endLng for point-to-point routes', () => {
+    expect(() =>
+      toPlanRoutePayload({
+        ...baseValues,
+        endLng: ' '
+      })
+    ).toThrow('endLng is required');
+  });
+
+  it('rejects non-numeric coordinates', () => {
+    expect(() =>
+      toPlanRoutePayload({
+        ...baseValues,
+        startLat: 'abc'
+      })
+    ).toThrow('startLat must be a valid number');
   });
 });

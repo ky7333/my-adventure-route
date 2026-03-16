@@ -328,7 +328,7 @@ describe('GraphHopperRoutingProvider', () => {
     expect(result[0].surfaceMix.unknownPercent).toBe(100);
   });
 
-  it('uses the trip endpoint for loop rides instead of route start/end duplication', async () => {
+  it('uses route endpoint round_trip params for loop rides without duplicating end points', async () => {
     const configService = {
       get: vi.fn((key: string, fallback: string) => {
         const map: Record<string, string> = {
@@ -378,7 +378,7 @@ describe('GraphHopperRoutingProvider', () => {
     });
 
     const requestUrl = new URL(fetchMock.mock.calls[0][0] as string);
-    expect(requestUrl.pathname).toBe('/trip');
+    expect(requestUrl.pathname).toBe('/route');
     expect(requestUrl.searchParams.get('algorithm')).toBe('round_trip');
     expect(requestUrl.searchParams.getAll('point')).toHaveLength(1);
   });

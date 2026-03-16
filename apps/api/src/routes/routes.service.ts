@@ -1,5 +1,6 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  locationInputSchema,
   planRouteResponseSchema,
   routeDetailResponseSchema,
   routeSurfaceSectionsSchema,
@@ -256,6 +257,10 @@ export class RoutesService {
       .sort((a, b) => b.score.total - a.score.total)
       .slice(0, 3);
 
+    if (scoredCandidates.length === 0) {
+      throw new NotFoundException('No route candidates were generated.');
+    }
+
     const routeRequest = await this.prisma.routeRequest.create({
       data: {
         userId,
@@ -336,6 +341,16 @@ export class RoutesService {
       throw new ForbiddenException('Route request does not belong to user');
     }
 
+    const hasCompleteEndLocation =
+      routeRequest.endLabel !== null && routeRequest.endLat !== null && routeRequest.endLng !== null;
+    const parsedEndLocation = hasCompleteEndLocation
+      ? locationInputSchema.safeParse({
+          label: routeRequest.endLabel,
+          lat: routeRequest.endLat,
+          lng: routeRequest.endLng
+        })
+      : null;
+
     return routeDetailResponseSchema.parse({
       routeRequestId: routeRequest.id,
       userId: routeRequest.userId,
@@ -344,13 +359,7 @@ export class RoutesService {
         lat: routeRequest.startLat,
         lng: routeRequest.startLng
       },
-      end: routeRequest.endLabel
-        ? {
-            label: routeRequest.endLabel,
-            lat: routeRequest.endLat,
-            lng: routeRequest.endLng
-          }
-        : null,
+      end: parsedEndLocation?.success ? parsedEndLocation.data : null,
       loopRide: routeRequest.loopRide,
       vehicleType: routeRequest.vehicleType,
       preferences: routeRequest.preferences,

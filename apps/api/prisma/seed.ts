@@ -10,17 +10,28 @@ if (!process.env.DATABASE_URL) {
 
 const prisma = new PrismaClient();
 
-function resolveDemoPassword(): string {
+type ResolvedDemoPassword = {
+  value: string;
+  source: 'env' | 'generated';
+};
+
+function resolveDemoPassword(): ResolvedDemoPassword {
   const configuredPassword = process.env.SEED_DEMO_PASSWORD?.trim();
   if (configuredPassword) {
-    return configuredPassword;
+    return {
+      value: configuredPassword,
+      source: 'env'
+    };
   }
 
   if (process.env.NODE_ENV === 'production') {
     throw new Error('[seed] SEED_DEMO_PASSWORD is required when NODE_ENV=production.');
   }
 
-  return randomBytes(24).toString('base64url');
+  return {
+    value: randomBytes(24).toString('base64url'),
+    source: 'generated'
+  };
 }
 
 async function main(): Promise<void> {
@@ -31,7 +42,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  const passwordHash = await bcrypt.hash(resolveDemoPassword(), 10);
+  const demoPassword = resolveDemoPassword();
+  const passwordHash = await bcrypt.hash(demoPassword.value, 10);
   await prisma.user.create({
     data: {
       email,
@@ -39,7 +51,12 @@ async function main(): Promise<void> {
     }
   });
 
-  console.log(`[seed] Seeded demo user ${email}. Password is sourced from env or generated locally.`);
+  if (process.env.NODE_ENV !== 'production' && demoPassword.source === 'generated') {
+    console.log(`[seed] Seeded demo user ${email}. Generated password: ${demoPassword.value}`);
+    return;
+  }
+
+  console.log(`[seed] Seeded demo user ${email}.`);
 }
 
 main()

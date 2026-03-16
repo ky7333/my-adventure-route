@@ -32,6 +32,8 @@ model RouteRequest {
 
   user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   options RouteOption[]
+
+  @@index([userId])
 }
 
 model RouteOption {
