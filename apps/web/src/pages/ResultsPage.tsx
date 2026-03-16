@@ -17,6 +17,9 @@ export function ResultsPage() {
     }
 
     let isMounted = true;
+    setError(null);
+    setRouteDetail(null);
+    setSelectedRouteId(null);
 
     fetchRoute(routeRequestId)
       .then((response) => {

@@ -25,10 +25,10 @@ interface GraphHopperResponse {
 function buildSurfaceMixFromSegments(segments: ScoreInputSegment[]): RawRouteCandidate['surfaceMix'] {
   if (!segments.length) {
     return {
-      pavedPercent: 100,
+      pavedPercent: 0,
       gravelPercent: 0,
       dirtPercent: 0,
-      unknownPercent: 0
+      unknownPercent: 100
     };
   }
 
@@ -41,10 +41,10 @@ function buildSurfaceMixFromSegments(segments: ScoreInputSegment[]): RawRouteCan
   const total = totals.paved + totals.gravel + totals.dirt + totals.unknown;
   if (total <= 0) {
     return {
-      pavedPercent: 100,
+      pavedPercent: 0,
       gravelPercent: 0,
       dirtPercent: 0,
-      unknownPercent: 0
+      unknownPercent: 100
     };
   }
 
@@ -90,7 +90,7 @@ function buildSurfaceMixFromSegments(segments: ScoreInputSegment[]): RawRouteCan
 
 function mapGraphHopperSurface(rawSurface: unknown): ScoreInputSegment['surface'] {
   if (typeof rawSurface !== 'string') {
-    return 'paved';
+    return 'unknown';
   }
 
   const value = rawSurface.toLowerCase().trim();
@@ -127,8 +127,7 @@ function mapGraphHopperSurface(rawSurface: unknown): ScoreInputSegment['surface'
     return 'paved';
   }
 
-  // Bias toward paved unless we have explicit off-road evidence.
-  return 'paved';
+  return 'unknown';
 }
 
 function mapGraphHopperRoadClass(rawRoadClass: string): ScoreInputSegment['roadClass'] {
@@ -258,7 +257,7 @@ function buildSegmentsFromPathDetails(
           const parsed = parseDetailEntry(roadClassDetails[0], edgeCount);
           return parsed ? mapGraphHopperRoadClass(parsed.value) : 'tertiary';
         })(),
-        surface: 'paved',
+        surface: 'unknown',
         technicalDifficulty: 30 + difficultyPreference / 3
       }
     ];
@@ -312,7 +311,7 @@ function buildSegmentsFromPathDetails(
       lengthKm: totalDistanceKm,
       curvature: 58 + index * 6,
       roadClass: 'tertiary',
-      surface: 'paved',
+      surface: 'unknown',
       technicalDifficulty: 30 + difficultyPreference / 3
     }
   ];
@@ -339,6 +338,7 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
   }
 
   async planCandidates(input: PlanRouteRequest): Promise<RawRouteCandidate[]> {
+    const isLoopRequest = input.loopRide || !input.end;
     const endPoint = input.end ?? input.start;
 
     const detailStrategies: string[][] = [
@@ -356,27 +356,48 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
         profile: this.profile,
         points_encoded: 'false',
         instructions: 'false',
-        'ch.disable': 'true',
-        algorithm: 'alternative_route',
-        'alternative_route.max_paths': '3',
-        'alternative_route.max_weight_factor': '2',
-        'alternative_route.max_share_factor': '0.8',
-        'alternative_route.min_plateau_factor': '0.1'
+        'ch.disable': 'true'
       });
+
+      if (isLoopRequest) {
+        query.set('algorithm', 'round_trip');
+        query.set('round_trip.distance', '100000');
+        query.set('round_trip.seed', '73');
+      } else {
+        query.set('algorithm', 'alternative_route');
+        query.set('alternative_route.max_paths', '3');
+        query.set('alternative_route.max_weight_factor', '2');
+        query.set('alternative_route.max_share_factor', '0.8');
+        query.set('alternative_route.min_plateau_factor', '0.1');
+      }
 
       for (const detail of details) {
         query.append('details', detail);
       }
 
       query.append('point', `${input.start.lat},${input.start.lng}`);
-      query.append('point', `${endPoint.lat},${endPoint.lng}`);
+      if (!isLoopRequest) {
+        query.append('point', `${endPoint.lat},${endPoint.lng}`);
+      }
 
       if (this.apiKey) {
         query.set('key', this.apiKey);
       }
 
-      requestUrl = `${this.baseUrl}/route?${query.toString()}`;
-      const response = await this.httpFetch(requestUrl);
+      requestUrl = `${this.baseUrl}/${isLoopRequest ? 'trip' : 'route'}?${query.toString()}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      let response: Response;
+      try {
+        response = await this.httpFetch(requestUrl, { signal: controller.signal });
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new Error('GraphHopper request timed out after 10000ms');
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+      }
 
       let parsedPayload: GraphHopperResponse = {};
       try {
@@ -418,6 +439,9 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
       const segments = buildSegmentsFromPathDetails(path, index, input.preferences.difficulty);
       const surfaceMix = buildSurfaceMixFromSegments(segments);
 
+      const sourceUrl = new URL(requestUrl);
+      sourceUrl.search = '';
+
       return {
         label: index === 0 ? 'Primary Adventure' : `Alternative ${index}`,
         distanceKm: path.distance / 1000,
@@ -431,7 +455,7 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
         providerMeta: {
           provider: 'graphhopper',
           profile: this.profile,
-          source: requestUrl,
+          source: sourceUrl.toString(),
           hasSurfaceDetails: Boolean(path.details?.surface?.length),
           // TODO: map sliders to GraphHopper custom_model for route personalization.
           // TODO: improve alternative route generation strategy (distance/time diversity constraints).

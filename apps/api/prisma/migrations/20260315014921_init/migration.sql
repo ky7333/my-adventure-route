@@ -50,7 +50,7 @@ CREATE TABLE "RouteOption" (
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
-CREATE INDEX "RouteOption_routeRequestId_rank_idx" ON "RouteOption"("routeRequestId", "rank");
+CREATE UNIQUE INDEX "RouteOption_routeRequestId_rank_idx" ON "RouteOption"("routeRequestId", "rank");
 
 -- AddForeignKey
 ALTER TABLE "RouteRequest" ADD CONSTRAINT "RouteRequest_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

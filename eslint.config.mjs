@@ -1,5 +1,11 @@
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
+
+const tsconfigRootDir = typeof import.meta.dirname === 'string'
+  ? import.meta.dirname
+  : dirname(fileURLToPath(import.meta.url));
 
 export default tseslint.config(
   js.configs.recommended,
@@ -9,7 +15,7 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: true,
-        tsconfigRootDir: import.meta.dirname
+        tsconfigRootDir
       }
     },
     rules: {
@@ -18,6 +24,6 @@ export default tseslint.config(
     }
   },
   {
-    ignores: ['dist/**', 'build/**', 'coverage/**', 'node_modules/**', '.turbo/**']
+    ignores: ['**/dist/**', '**/build/**', '**/coverage/**', '**/node_modules/**', '**/.turbo/**']
   }
 );

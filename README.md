@@ -54,7 +54,8 @@ Note: in local development, the web app uses Vite proxy (`/api` -> `http://local
 
 ## Default credentials from seed
 - Email: `demo@adventureroute.dev`
-- Password: `password123`
+- Password: `password123` (when seeding with `SEED_DEMO_PASSWORD=password123`)
+Warning: local seed data only. Change or remove this account in any shared, staging, or production environment, and disable seed accounts in deployments by skipping `pnpm db:seed` outside local development.
 
 ## Key API endpoints
 - `POST /api/auth/register`

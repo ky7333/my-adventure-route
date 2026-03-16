@@ -61,8 +61,9 @@ describe('GraphHopperRoutingProvider', () => {
         result[0].surfaceMix.dirtPercent +
         result[0].surfaceMix.unknownPercent
     ).toBe(100);
-    expect(result[0].surfaceMix.pavedPercent).toBe(100);
+    expect(result[0].surfaceMix.pavedPercent).toBe(0);
     expect(result[0].surfaceMix.gravelPercent).toBe(0);
+    expect(result[0].surfaceMix.unknownPercent).toBe(100);
   });
 
   it('uses GraphHopper surface path details when present', async () => {
@@ -190,8 +191,12 @@ describe('GraphHopperRoutingProvider', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const secondRetryUrl = new URL(fetchMock.mock.calls[1][0] as string);
+    expect(secondRetryUrl.searchParams.getAll('details')).toEqual(['road_class']);
     expect(result).toHaveLength(1);
-    expect(result[0].surfaceMix.pavedPercent).toBe(100);
+    expect(result[0].surfaceMix.pavedPercent).toBe(0);
+    expect(result[0].surfaceMix.unknownPercent).toBe(100);
   });
 
   it('handles non-array hints payloads when detecting unsupported details', async () => {
@@ -258,8 +263,12 @@ describe('GraphHopperRoutingProvider', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const secondRetryUrl = new URL(fetchMock.mock.calls[1][0] as string);
+    expect(secondRetryUrl.searchParams.getAll('details')).toEqual(['road_class']);
     expect(result).toHaveLength(1);
-    expect(result[0].surfaceMix.pavedPercent).toBe(100);
+    expect(result[0].surfaceMix.pavedPercent).toBe(0);
+    expect(result[0].surfaceMix.unknownPercent).toBe(100);
   });
 
   it('supports GraphHopper detail tuple format [from,to,value]', async () => {
@@ -315,6 +324,62 @@ describe('GraphHopperRoutingProvider', () => {
     });
 
     expect(result).toHaveLength(1);
-    expect(result[0].surfaceMix.pavedPercent).toBe(100);
+    expect(result[0].surfaceMix.pavedPercent).toBe(0);
+    expect(result[0].surfaceMix.unknownPercent).toBe(100);
+  });
+
+  it('uses the trip endpoint for loop rides instead of route start/end duplication', async () => {
+    const configService = {
+      get: vi.fn((key: string, fallback: string) => {
+        const map: Record<string, string> = {
+          GRAPHHOPPER_BASE_URL: 'http://localhost:8989',
+          GRAPHHOPPER_PROFILE: 'car',
+          GRAPHHOPPER_API_KEY: ''
+        };
+        return map[key] ?? fallback;
+      })
+    } as unknown as ConfigService;
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          paths: [
+            {
+              distance: 50000,
+              time: 3600000,
+              points: {
+                coordinates: [
+                  [-72.7, 44.4],
+                  [-72.4, 44.6],
+                  [-72.7, 44.4]
+                ]
+              }
+            }
+          ]
+        }),
+        { status: 200 }
+      )
+    );
+
+    const provider = new GraphHopperRoutingProvider(configService);
+    provider.setHttpFetchForTesting(fetchMock as unknown as typeof fetch);
+
+    await provider.planCandidates({
+      start: { label: 'A', lat: 44.4, lng: -72.7 },
+      loopRide: true,
+      vehicleType: '4x4',
+      preferences: {
+        curvy: 80,
+        scenic: 60,
+        avoidHighways: 70,
+        unpavedPreference: 50,
+        difficulty: 40
+      }
+    });
+
+    const requestUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(requestUrl.pathname).toBe('/trip');
+    expect(requestUrl.searchParams.get('algorithm')).toBe('round_trip');
+    expect(requestUrl.searchParams.getAll('point')).toHaveLength(1);
   });
 });

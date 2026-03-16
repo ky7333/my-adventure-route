@@ -46,4 +46,26 @@ describe('toPlanRoutePayload', () => {
 
     expect(payload.end).toBeUndefined();
   });
+
+  it('rejects blank coordinate strings', () => {
+    expect(() =>
+      toPlanRoutePayload({
+        startLabel: 'Start',
+        startLat: '   ',
+        startLng: '-72.7',
+        endLabel: 'End',
+        endLat: '44.8',
+        endLng: '-72.1',
+        loopRide: false,
+        vehicleType: '4x4',
+        preferences: {
+          curvy: 60,
+          scenic: 65,
+          avoidHighways: 70,
+          unpavedPreference: 55,
+          difficulty: 55
+        }
+      })
+    ).toThrow('startLat is required');
+  });
 });

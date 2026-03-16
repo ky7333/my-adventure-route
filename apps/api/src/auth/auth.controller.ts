@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Inject, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, HttpCode, Inject, Post } from '@nestjs/common';
 import { authLoginSchema, authRegisterSchema } from '@adventure/contracts';
 import { AuthService } from './auth.service';
 
@@ -17,6 +17,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @HttpCode(200)
   async login(@Body() body: unknown) {
     const parsed = authLoginSchema.safeParse(body);
     if (!parsed.success) {

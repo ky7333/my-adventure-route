@@ -267,15 +267,9 @@ export class RoutesService {
         endLng: input.end?.lng ?? null,
         loopRide: input.loopRide,
         vehicleType: input.vehicleType,
-        preferences: input.preferences as Prisma.InputJsonValue
-      }
-    });
-
-    const options = await Promise.all(
-      scoredCandidates.map((candidate, index) =>
-        this.prisma.routeOption.create({
-          data: {
-            routeRequestId: routeRequest.id,
+        preferences: input.preferences as Prisma.InputJsonValue,
+        options: {
+          create: scoredCandidates.map((candidate, index) => ({
             rank: index + 1,
             label: candidate.label,
             distanceKm: candidate.distanceKm,
@@ -289,12 +283,19 @@ export class RoutesService {
               ...candidate.providerMeta,
               surfaceSections: candidate.surfaceSections
             } as Prisma.InputJsonValue
+          }))
+        }
+      },
+      include: {
+        options: {
+          orderBy: {
+            rank: 'asc'
           }
-        })
-      )
-    );
+        }
+      }
+    });
 
-    const responseOptions: RouteAlternative[] = options.map((option) => ({
+    const responseOptions: RouteAlternative[] = routeRequest.options.map((option) => ({
       id: option.id,
       rank: option.rank,
       label: option.label,

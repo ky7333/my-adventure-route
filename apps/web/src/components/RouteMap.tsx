@@ -207,8 +207,29 @@ export function RouteMap({ options, selectedRouteId }: RouteMapProps) {
         return;
       }
 
+      const baseSourceId = 'selected-route-base';
+      const baseLayerId = 'selected-route-base-line';
+      const surfaceSourceId = 'selected-route-surfaces';
+      const surfaceLayerId = 'selected-route-surfaces-line';
+      const clearRenderedRoute = (): void => {
+        const emptyFeatureCollection = {
+          type: 'FeatureCollection' as const,
+          features: []
+        };
+        const baseSource = map.getSource(baseSourceId);
+        if (baseSource) {
+          (baseSource as GeoJSONSource).setData(emptyFeatureCollection as any);
+        }
+        const surfaceSource = map.getSource(surfaceSourceId);
+        if (surfaceSource) {
+          (surfaceSource as GeoJSONSource).setData(emptyFeatureCollection as any);
+        }
+        lastFittedRouteIdRef.current = null;
+      };
+
       const selected = options.find((option) => option.id === selectedRouteId) ?? options[0];
       if (!selected || selected.geometry.coordinates.length < 2) {
+        clearRenderedRoute();
         return;
       }
 
@@ -228,11 +249,6 @@ export function RouteMap({ options, selectedRouteId }: RouteMapProps) {
         ]
       };
       const surfaceData = buildSurfaceFeatures(selected);
-
-      const baseSourceId = 'selected-route-base';
-      const baseLayerId = 'selected-route-base-line';
-      const surfaceSourceId = 'selected-route-surfaces';
-      const surfaceLayerId = 'selected-route-surfaces-line';
 
       try {
         if (map.getSource(baseSourceId)) {

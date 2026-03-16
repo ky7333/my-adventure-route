@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planRouteRequestSchema } from './index';
+import { planRouteRequestSchema, routeSurfaceSectionSchema } from './index';
 
 describe('planRouteRequestSchema', () => {
   it('rejects point-to-point route without end location', () => {
@@ -14,6 +14,16 @@ describe('planRouteRequestSchema', () => {
         unpavedPreference: 50,
         difficulty: 50
       }
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it('rejects surface sections where startCoordinateIndex is greater than endCoordinateIndex', () => {
+    const parsed = routeSurfaceSectionSchema.safeParse({
+      startCoordinateIndex: 3,
+      endCoordinateIndex: 2,
+      surface: 'gravel'
     });
 
     expect(parsed.success).toBe(false);

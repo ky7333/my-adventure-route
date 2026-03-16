@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "tsx watch src/main.ts",
+    "dev": "sh -c 'tsc -p tsconfig.build.json && tsc -p tsconfig.build.json --watch --preserveWatchOutput & node --watch dist/main.js'",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "lint": "eslint src test prisma --ext .ts",

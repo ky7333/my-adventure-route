@@ -10,10 +10,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey:
-        configService?.get<string>('JWT_SECRET', 'dev-super-secret') ??
-        process.env.JWT_SECRET ??
-        'dev-super-secret'
+      secretOrKey: (() => {
+        const jwtSecret = configService.get<string>('JWT_SECRET');
+        if (!jwtSecret) {
+          throw new Error('JWT_SECRET environment variable is required');
+        }
+
+        return jwtSecret;
+      })()
     });
   }
 

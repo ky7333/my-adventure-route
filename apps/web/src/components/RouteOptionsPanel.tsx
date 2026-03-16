@@ -28,7 +28,7 @@ export function RouteOptionsPanel({
             <div>Twistiness: {option.twistinessScore.toFixed(0)}</div>
             <div>
               Surface mix: paved {option.surfaceMix.pavedPercent}% / gravel {option.surfaceMix.gravelPercent}%
-              {' '} / dirt {option.surfaceMix.dirtPercent}%
+              {' '} / dirt {option.surfaceMix.dirtPercent}% / unknown {option.surfaceMix.unknownPercent}%
             </div>
           </button>
         ))}

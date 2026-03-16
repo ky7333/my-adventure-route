@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { register } from '../lib/api';
 import { setAccessToken } from '../lib/auth';
@@ -8,10 +8,16 @@ export function SignupPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
+    if (isSubmittingRef.current) {
+      return;
+    }
+
+    isSubmittingRef.current = true;
     setError(null);
     setIsSubmitting(true);
 
@@ -22,6 +28,7 @@ export function SignupPage() {
     } catch (submissionError) {
       setError((submissionError as Error).message);
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };

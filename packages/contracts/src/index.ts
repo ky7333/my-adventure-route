@@ -62,6 +62,14 @@ export const routeSurfaceSectionSchema = z.object({
   startCoordinateIndex: z.number().int().min(0),
   endCoordinateIndex: z.number().int().min(1),
   surface: routeSurfaceTypeSchema
+}).superRefine((section, ctx) => {
+  if (section.startCoordinateIndex > section.endCoordinateIndex) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'startCoordinateIndex must be less than or equal to endCoordinateIndex',
+      path: ['startCoordinateIndex']
+    });
+  }
 });
 export type RouteSurfaceSection = z.infer<typeof routeSurfaceSectionSchema>;
 export const routeSurfaceSectionsSchema = z.array(routeSurfaceSectionSchema);

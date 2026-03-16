@@ -53,6 +53,10 @@ export class MockRoutingProvider implements RoutingProvider {
         createSegment(index + 2, 'tertiary'),
         createSegment(index + 3, index === 0 ? 'primary' : 'track')
       ];
+      const pavedPercent = index === 0 ? 62 : 42;
+      const gravelPercent = index === 1 ? 36 : 24;
+      const dirtPercent = index === 2 ? 30 : 10;
+      const unknownPercent = Math.max(0, 100 - (pavedPercent + gravelPercent + dirtPercent));
 
       return {
         label,
@@ -63,10 +67,10 @@ export class MockRoutingProvider implements RoutingProvider {
           coordinates
         },
         surfaceMix: {
-          pavedPercent: index === 0 ? 62 : 42,
-          gravelPercent: index === 1 ? 36 : 24,
-          dirtPercent: index === 2 ? 30 : 10,
-          unknownPercent: 4
+          pavedPercent,
+          gravelPercent,
+          dirtPercent,
+          unknownPercent
         },
         segments,
         providerMeta: {

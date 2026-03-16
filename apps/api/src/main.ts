@@ -3,12 +3,39 @@ import { NestFactory } from '@nestjs/core';
 import 'reflect-metadata';
 import { AppModule } from './app.module';
 
+function resolvePort(rawPort: string | undefined): number {
+  if (rawPort === undefined) {
+    return 3001;
+  }
+
+  const trimmed = rawPort.trim();
+  if (!trimmed) {
+    throw new Error('PORT cannot be empty.');
+  }
+
+  const parsed = Number(trimmed);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65_535) {
+    throw new Error(`PORT must be an integer between 1 and 65535. Received: "${rawPort}"`);
+  }
+
+  return parsed;
+}
+
 async function bootstrap(): Promise<void> {
   if (!process.env.DATABASE_URL && process.env.NODE_ENV !== 'production') {
     process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/adventure_route';
     console.warn(
       '[api] DATABASE_URL not set. Using local default postgres URL for development.'
     );
+  }
+
+  let port: number;
+  try {
+    port = resolvePort(process.env.PORT);
+  } catch (error) {
+    console.error(`[api] ${(error as Error).message}`);
+    process.exit(1);
+    return;
   }
 
   const app = await NestFactory.create(AppModule);
@@ -46,7 +73,6 @@ async function bootstrap(): Promise<void> {
     credentials: true
   });
 
-  const port = Number(process.env.PORT ?? 3001);
   await app.listen(port);
   console.log(`API running on http://localhost:${port}/api`);
 }
