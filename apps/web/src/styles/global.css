@@ -47,6 +47,9 @@
   --primary-dark: #05563e;
   --accent: #d46a38;
   --border: #c8d0c7;
+  --active: #3b82f6;
+  --active-soft: #ebf3ff;
+  --active-soft-subtle: #f6faff;
 }
 
 * {
@@ -432,12 +435,12 @@ select {
 }
 
 .route-chip.active {
-  border-color: #3b82f6;
-  background: #ebf3ff;
+  border-color: var(--active);
+  background: var(--active-soft);
 }
 
 .route-chip:focus-visible {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid var(--active);
   outline-offset: 1px;
 }
 
@@ -519,8 +522,8 @@ select {
 }
 
 .route-card.active {
-  border-color: #3b82f6;
-  background: #f6faff;
+  border-color: var(--active);
+  background: var(--active-soft-subtle);
 }
 
 .route-card-title {

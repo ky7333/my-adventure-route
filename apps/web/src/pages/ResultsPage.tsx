@@ -142,14 +142,14 @@ export function ResultsPage() {
           <h1>Route Planner</h1>
           <div className="from-to-lines">
             <div className="from-to-line">
-              <span className="from-to-pin from-to-pin-start" aria-hidden />
+              <span className="from-to-pin from-to-pin-start" aria-hidden="true" />
               <div className="from-to-copy">
                 <span className="from-to-label">From</span>
                 <span className="from-to-value">{routeDetail.start.label}</span>
               </div>
             </div>
             <div className="from-to-line">
-              <span className="from-to-pin from-to-pin-end" aria-hidden />
+              <span className="from-to-pin from-to-pin-end" aria-hidden="true" />
               <div className="from-to-copy">
                 <span className="from-to-label">To</span>
                 <span className="from-to-value">{destinationLabel}</span>
