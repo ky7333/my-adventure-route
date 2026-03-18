@@ -17,7 +17,8 @@ describe('planRouteRequestSchema', () => {
         scenic: 50,
         avoidHighways: 50,
         unpavedPreference: 50,
-        difficulty: 50
+        difficulty: 50,
+        distanceInfluence: 18
       }
     });
 
@@ -35,7 +36,8 @@ describe('planRouteRequestSchema', () => {
         scenic: 50,
         avoidHighways: 50,
         unpavedPreference: 50,
-        difficulty: 50
+        difficulty: 50,
+        distanceInfluence: 18
       }
     });
 

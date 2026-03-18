@@ -28,12 +28,12 @@ services:
       - ./data/graphhopper:/data
       - ./data/osm:/data/osm
     environment:
-      JAVA_OPTS: '-Xmx2g -Ddw.graphhopper.graph.encoded_values=road_class,road_environment,max_speed,road_access,surface,car_access,car_average_speed'
+      JAVA_OPTS: '-Xmx4g -Xms4g -Ddw.graphhopper.graph.encoded_values=road_class,road_environment,max_speed,road_access,surface,car_access,car_average_speed'
     command:
       - '--input'
-      - '/data/osm/vermont-latest.osm.pbf'
+      - '/data/osm/${OSM_PBF_FILE:-vermont-latest.osm.pbf}'
       - '--graph-cache'
-      - '/data/adventure-vt-gh'
+      - '/data/${OSM_GRAPH_CACHE:-adventure-vt-gh}'
       - '--host'
       - '0.0.0.0'
       - '--port'

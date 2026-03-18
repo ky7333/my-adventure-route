@@ -4,7 +4,9 @@ import { clearAccessToken, isAuthenticated } from '../lib/auth';
 
 export function AppLayout({ children }: PropsWithChildren) {
   const navigate = useNavigate();
-  const isMapResultsPage = useMatch('/results/:routeRequestId') !== null;
+  const isMapPlanPage = useMatch('/plan') !== null;
+  const isLegacyResultsPath = useMatch('/results/:routeRequestId') !== null;
+  const isMapLayout = isMapPlanPage || isLegacyResultsPath;
 
   const handleLogout = (): void => {
     clearAccessToken();
@@ -12,8 +14,8 @@ export function AppLayout({ children }: PropsWithChildren) {
   };
 
   return (
-    <div className={`app-shell ${isMapResultsPage ? 'app-shell--map' : ''}`}>
-      <header className={`site-header ${isMapResultsPage ? 'site-header--map' : ''}`}>
+    <div className={`app-shell ${isMapLayout ? 'app-shell--map' : ''}`}>
+      <header className={`site-header ${isMapLayout ? 'site-header--map' : ''}`}>
         <Link to="/" className="brand">
           Adventure Route
         </Link>
@@ -31,7 +33,7 @@ export function AppLayout({ children }: PropsWithChildren) {
           )}
         </nav>
       </header>
-      <main className={`page-container ${isMapResultsPage ? 'page-container--map' : ''}`}>
+      <main className={`page-container ${isMapLayout ? 'page-container--map' : ''}`}>
         {children}
       </main>
     </div>

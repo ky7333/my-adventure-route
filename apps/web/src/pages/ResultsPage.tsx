@@ -4,6 +4,8 @@ import type { RouteAlternative, RouteDetailResponse } from '@adventure/contracts
 import { RouteMap } from '../components/RouteMap';
 import { RouteOptionsPanel } from '../components/RouteOptionsPanel';
 import { fetchRoute } from '../lib/api';
+import { formatRouteDistance } from '../lib/formatDistance';
+import { formatRouteDuration } from '../lib/formatDuration';
 
 interface FitPadding {
   top: number;
@@ -158,7 +160,7 @@ export function ResultsPage() {
           </div>
           {selectedRoute && (
             <p className="from-to-stats">
-              Selected: {selectedRoute.distanceKm.toFixed(1)} km • {selectedRoute.durationMin.toFixed(0)} min
+              Selected: {formatRouteDistance(selectedRoute.distanceKm)} • {formatRouteDuration(selectedRoute.durationMin)}
             </p>
           )}
         </section>

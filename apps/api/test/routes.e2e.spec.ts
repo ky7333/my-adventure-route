@@ -130,7 +130,8 @@ describe('RoutesController (integration)', () => {
           scenic: 70,
           avoidHighways: 80,
           unpavedPreference: 60,
-          difficulty: 50
+          difficulty: 50,
+          distanceInfluence: 18
         }
       }
     );

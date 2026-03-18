@@ -13,7 +13,8 @@ const request = {
     scenic: 70,
     avoidHighways: 75,
     unpavedPreference: 45,
-    difficulty: 55
+    difficulty: 55,
+    distanceInfluence: 18
   }
 };
 
@@ -59,7 +60,7 @@ function createProviderCandidate(label: string): RawRouteCandidate {
 }
 
 describe('RoutingService', () => {
-  it('derives alternatives from provider geometry before mock fallback', async () => {
+  it('returns graphhopper routes as-is when fewer than three are available', async () => {
     const primary = createProviderCandidate('Primary Adventure');
     const provider: RoutingProvider = {
       planCandidates: vi.fn().mockResolvedValue([primary])
@@ -68,27 +69,11 @@ describe('RoutingService', () => {
     const service = new RoutingService(new MockRoutingProvider(), provider);
     const result = await service.planCandidates(request);
 
-    expect(result).toHaveLength(3);
+    expect(result).toHaveLength(1);
     expect(result[0].label).toBe('Primary Adventure');
-    expect(result[1].label).toContain('(Faster)');
-    expect(result[2].label).toContain('(Curvier)');
-    expect(result[1].distanceKm).toBeLessThan(primary.distanceKm);
-    expect(result[1].durationMin).toBeLessThan(primary.durationMin);
-    expect(result[1].geometry.coordinates.length).toBeLessThanOrEqual(
-      primary.geometry.coordinates.length
-    );
-    expect(result[2].geometry.coordinates).toHaveLength(primary.geometry.coordinates.length);
-    expect(result[2].distanceKm).toBeGreaterThan(primary.distanceKm);
-    expect(result[2].segments[0]?.curvature).toBeGreaterThan(primary.segments[0]?.curvature ?? 0);
-    expect(result[1].providerMeta).toMatchObject({
-      provider: 'graphhopper',
-      derivedFrom: 'Primary Adventure',
-      strategy: 'faster'
-    });
-    expect(result[2].providerMeta).toMatchObject({
-      provider: 'graphhopper',
-      derivedFrom: 'Primary Adventure',
-      strategy: 'curvier'
+    expect(result[0].geometry.coordinates).toEqual(primary.geometry.coordinates);
+    expect(result[0].providerMeta).toMatchObject({
+      provider: 'graphhopper'
     });
   });
 
