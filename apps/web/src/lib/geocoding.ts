@@ -30,7 +30,8 @@ export async function geocodeAddress(address: string, fieldLabel: string): Promi
 
   const response = await fetch(endpoint, {
     headers: {
-      Accept: 'application/json'
+      Accept: 'application/json',
+      'User-Agent': 'my-adventure-route/1.0 (+https://github.com/ky7333/my-adventure-route)'
     }
   });
 
