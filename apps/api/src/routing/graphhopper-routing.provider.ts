@@ -481,7 +481,7 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
         } else {
           requestBody.algorithm = 'alternative_route';
           requestBody['alternative_route.max_paths'] = 3;
-          // requestBody['astarbi.epsilon'] = 1.6;
+          requestBody['astarbi.epsilon'] = 1.6;
           (requestBody.points as [number, number][]).push([endPoint.lng, endPoint.lat]);
         }
 
@@ -497,7 +497,12 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
           requestBody.custom_model = customModel;
         }
 
-        this.logger.debug(`GraphHopper payload: ${JSON.stringify(requestBody)}`);
+        const requestPoints = requestBody.points;
+        const sanitizedRequestBody = {
+          ...requestBody,
+          points: Array.isArray(requestPoints) ? `[REDACTED:${requestPoints.length} points]` : '[REDACTED]'
+        };
+        this.logger.debug(`GraphHopper payload: ${JSON.stringify(sanitizedRequestBody)}`);
 
         const routeUrl = new URL(`${this.baseUrl}/route`);
         if (this.apiKey) {

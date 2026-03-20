@@ -89,6 +89,10 @@ describe('GraphHopperRoutingProvider', () => {
     expect(request.url.pathname).toBe('/api/1/route');
     expect(request.url.searchParams.get('key')).toBe('test-key');
     expect(request.init?.method).toBe('POST');
+    expect(request.body.algorithm).toBe('alternative_route');
+    expect(request.body['alternative_route.max_paths']).toBe(3);
+    expect(request.body['astarbi.epsilon']).toBe(1.6);
+    expect((request.body.points as unknown[] | undefined)?.length).toBe(2);
   });
 
   it('returns all alternative paths so downstream ranking can choose the top 3', async () => {

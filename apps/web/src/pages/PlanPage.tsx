@@ -226,8 +226,14 @@ export function PlanPage() {
     const updateFitPadding = (): void => {
       const layoutRect = layout.getBoundingClientRect();
       const panelRect = panel.getBoundingClientRect();
-      const overlapWidth = Math.max(0, Math.min(layoutRect.right, panelRect.right) - layoutRect.left);
-      const overlapHeight = Math.max(0, Math.min(layoutRect.bottom, panelRect.bottom) - layoutRect.top);
+      const overlapWidth = Math.max(
+        0,
+        Math.min(layoutRect.right, panelRect.right) - Math.max(layoutRect.left, panelRect.left)
+      );
+      const overlapHeight = Math.max(
+        0,
+        Math.min(layoutRect.bottom, panelRect.bottom) - Math.max(layoutRect.top, panelRect.top)
+      );
       const isNarrowLayout = overlapWidth > layoutRect.width * 0.55;
       const maxTopPadding = Math.max(BASE_PADDING, Math.round(layoutRect.height - 80));
       const maxLeftPadding = Math.max(BASE_PADDING, Math.round(layoutRect.width - 80));

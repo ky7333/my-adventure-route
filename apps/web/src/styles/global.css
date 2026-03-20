@@ -293,7 +293,7 @@ select {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
-  overflow: hidden;
+  overflow: visible;
   pointer-events: none;
 }
 

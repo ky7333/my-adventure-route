@@ -21,7 +21,11 @@ const basePlanRequest = {
   }
 };
 
-function makePlanRequest(overrides: Partial<typeof basePlanRequest> = {}) {
+type PlanRequestOverrides = Partial<Omit<typeof basePlanRequest, 'preferences'>> & {
+  preferences?: Partial<typeof basePlanRequest.preferences>;
+};
+
+function makePlanRequest(overrides: PlanRequestOverrides = {}) {
   return {
     ...basePlanRequest,
     ...overrides,
