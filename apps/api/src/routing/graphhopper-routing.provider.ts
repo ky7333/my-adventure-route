@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { PlanRouteRequest } from '@adventure/contracts';
 import type { ScoreInputSegment } from '@adventure/scoring';
@@ -20,6 +20,18 @@ interface GraphHopperResponse {
   message?: string;
   hints?: unknown;
   paths?: GraphHopperPath[];
+}
+
+const TARGET_ROUTE_PATH_COUNT = 3;
+
+interface GraphHopperCustomModelRule {
+  if: string;
+  multiply_by: string;
+}
+
+interface GraphHopperCustomModel {
+  distance_influence: number;
+  priority: GraphHopperCustomModelRule[];
 }
 
 function buildSurfaceMixFromSegments(segments: ScoreInputSegment[]): RawRouteCandidate['surfaceMix'] {
@@ -195,6 +207,61 @@ function buildGraphHopperErrorMessage(payload: GraphHopperResponse, status: numb
   return `GraphHopper request failed (${status})`;
 }
 
+function isUnsupportedCustomModelError(payload: GraphHopperResponse): boolean {
+  const message = (payload.message ?? '').toLowerCase();
+  if (message.includes('custom_model')) {
+    return true;
+  }
+
+  return extractHintStrings(payload.hints).some((value) => value.toLowerCase().includes('custom_model'));
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function toFactor(value: number): string {
+  return value.toFixed(2);
+}
+
+function buildCustomModel(preferences: PlanRouteRequest['preferences']): GraphHopperCustomModel {
+  const avoidHighwaysRatio = clamp(preferences.avoidHighways / 100, 0, 1);
+  const unpavedRatio = clamp(preferences.unpavedPreference / 100, 0, 1);
+  // Aggressive curve so mid-high slider values already strongly avoid major roads.
+  const aggressiveAvoidCurve = Math.pow(avoidHighwaysRatio, 0.65);
+  // Keep off-pavement preference independent from highway avoidance.
+  const aggressiveUnpavedCurve = Math.pow(unpavedRatio, 0.8);
+  const motorwayPenalty = clamp(0.08 - aggressiveAvoidCurve * 0.1, 0.01, 0.08);
+  const trunkPenalty = clamp(0.25 - aggressiveAvoidCurve * 0.28, 0.01, 0.25);
+  const primaryPenalty = clamp(0.45 - aggressiveAvoidCurve * 0.4, 0.03, 0.45);
+  const secondaryPenalty = clamp(0.9 - aggressiveAvoidCurve * 0.72, 0.18, 0.9);
+  const tertiaryPenalty = clamp(
+    0.92 + (preferences.curvy + preferences.scenic) / 1000,
+    0.92,
+    1
+  );
+  const trackPenalty = clamp(
+    0.9 + (preferences.unpavedPreference + preferences.difficulty) / 500,
+    0.9,
+    1
+  );
+  const pavedPenalty = clamp(1 - aggressiveUnpavedCurve * 0.75, 0.25, 1);
+  const distanceInfluence = Math.round(clamp(preferences.distanceInfluence, 15, 100));
+
+  return {
+    distance_influence: distanceInfluence,
+    priority: [
+      { if: 'road_class == MOTORWAY', multiply_by: toFactor(motorwayPenalty) },
+      { if: 'road_class == TRUNK', multiply_by: toFactor(trunkPenalty) },
+      { if: 'road_class == PRIMARY', multiply_by: toFactor(primaryPenalty) },
+      { if: 'road_class == SECONDARY', multiply_by: toFactor(secondaryPenalty) },
+      { if: 'road_class == TERTIARY', multiply_by: toFactor(tertiaryPenalty) },
+      { if: 'road_class == TRACK', multiply_by: toFactor(trackPenalty) },
+      { if: 'surface == PAVED', multiply_by: toFactor(pavedPenalty) }
+    ]
+  };
+}
+
 function parseDetailEntry(
   entry: unknown,
   maxEdgeIndex: number
@@ -322,6 +389,7 @@ function buildSegmentsFromPathDetails(
 
 @Injectable()
 export class GraphHopperRoutingProvider implements RoutingProvider {
+  private readonly logger = new Logger(GraphHopperRoutingProvider.name);
   private readonly baseUrl: string;
   private readonly profile: string;
   private readonly apiKey: string;
@@ -329,11 +397,24 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
 
   constructor(@Inject(ConfigService) private readonly configService: ConfigService) {
     this.httpFetch = fetch;
+    const sourceRaw = this.configService?.get<string>('GRAPHHOPPER_SOURCE', 'local') ?? 'local';
+    const source = sourceRaw.toLowerCase();
+    if (source !== 'local' && source !== 'cloud') {
+      throw new Error(
+        `Invalid GRAPHHOPPER_SOURCE value "${sourceRaw}". Expected "local" or "cloud".`
+      );
+    }
+
+    const defaultBaseUrl =
+      source === 'cloud' ? 'https://graphhopper.com/api/1' : 'http://localhost:8989';
     this.baseUrl =
-      this.configService?.get<string>('GRAPHHOPPER_BASE_URL', 'http://localhost:8989') ??
-      'http://localhost:8989';
+      this.configService?.get<string>('GRAPHHOPPER_BASE_URL', defaultBaseUrl) ?? defaultBaseUrl;
     this.profile = this.configService?.get<string>('GRAPHHOPPER_PROFILE', 'car') ?? 'car';
     this.apiKey = this.configService?.get<string>('GRAPHHOPPER_API_KEY', '') ?? '';
+
+    if (source === 'cloud' && !this.apiKey.trim()) {
+      throw new Error('GRAPHHOPPER_API_KEY must be set when GRAPHHOPPER_SOURCE=cloud.');
+    }
   }
 
   setHttpFetchForTesting(httpFetch: typeof fetch): void {
@@ -365,98 +446,167 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
     const isLoopRequest = input.loopRide || !input.end;
     const endPoint = input.end ?? input.start;
     const profile = this.mapVehicleTypeToProfile(input.vehicleType);
+    const preferredCustomModel = buildCustomModel(input.preferences);
+    const modelAttempts: Array<GraphHopperCustomModel | null> = [preferredCustomModel, null];
 
     const detailStrategies: string[][] = [
-      ['surface', 'road_class'],
+      ['road_class', 'road_environment', 'max_speed', 'average_speed', 'surface'],
       ['road_class'],
       []
     ];
 
     let payload: GraphHopperResponse | null = null;
     let requestUrl = '';
+    let selectedRequestUrl = '';
+    let usedCustomModel = false;
+    let stopSearch = false;
+    let hasLoggedCustomModel = false;
     let lastFailureMessage = 'GraphHopper returned no route paths';
 
-    for (const details of detailStrategies) {
-      const query = new URLSearchParams({
-        profile,
-        points_encoded: 'false',
-        instructions: 'false',
-        'ch.disable': 'true'
-      });
+    for (const customModel of modelAttempts) {
+      let shouldTryWithoutCustomModel = false;
+      let foundPathsForCurrentModel = false;
 
-      if (isLoopRequest) {
-        query.set('algorithm', 'round_trip');
-        query.set('round_trip.distance', '100000');
-        query.set('round_trip.seed', '73');
-      } else {
-        query.set('algorithm', 'alternative_route');
-        query.set('alternative_route.max_paths', '3');
-        query.set('alternative_route.max_weight_factor', '2');
-        query.set('alternative_route.max_share_factor', '0.8');
-        query.set('alternative_route.min_plateau_factor', '0.1');
-      }
+      for (const details of detailStrategies) {
+        const requestBody: Record<string, unknown> = {
+          profile,
+          points: [[input.start.lng, input.start.lat]],
+          points_encoded: false,
+          'ch.disable': true,
+          timeout_ms: 10000,
+          snap_preventions: ['ferry'],
+          instructions: false,
+        };
 
-      for (const detail of details) {
-        query.append('details', detail);
-      }
-
-      query.append('point', `${input.start.lat},${input.start.lng}`);
-      if (!isLoopRequest) {
-        query.append('point', `${endPoint.lat},${endPoint.lng}`);
-      }
-
-      if (this.apiKey) {
-        query.set('key', this.apiKey);
-      }
-
-      requestUrl = `${this.baseUrl}/route?${query.toString()}`;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10_000);
-      let response: Response;
-      try {
-        response = await this.httpFetch(requestUrl, { signal: controller.signal });
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          throw new Error('GraphHopper request timed out after 10000ms');
+        if (isLoopRequest) {
+          requestBody.algorithm = 'round_trip';
+          requestBody['round_trip.distance'] = 100000;
+          requestBody['round_trip.seed'] = 73;
+        } else {
+          requestBody.algorithm = 'alternative_route';
+          requestBody['alternative_route.max_paths'] = 3;
+          requestBody['astarbi.epsilon'] = 1.6;
+          (requestBody.points as [number, number][]).push([endPoint.lng, endPoint.lat]);
         }
-        throw error;
-      } finally {
-        clearTimeout(timeout);
+
+        if (details.length > 0) {
+          requestBody.details = details;
+        }
+
+        if (customModel) {
+          if (!hasLoggedCustomModel) {
+            this.logger.debug(`GraphHopper custom_model: ${JSON.stringify(customModel)}`);
+            hasLoggedCustomModel = true;
+          }
+          requestBody.custom_model = customModel;
+        }
+
+        const requestPoints = requestBody.points;
+        const sanitizedRequestBody = {
+          ...requestBody,
+          points: Array.isArray(requestPoints) ? `[REDACTED:${requestPoints.length} points]` : '[REDACTED]'
+        };
+        this.logger.debug(`GraphHopper payload: ${JSON.stringify(sanitizedRequestBody)}`);
+
+        const routeUrl = new URL(`${this.baseUrl}/route`);
+        if (this.apiKey) {
+          routeUrl.searchParams.set('key', this.apiKey);
+        }
+        requestUrl = routeUrl.toString();
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10_000);
+        let response: Response;
+        try {
+          response = await this.httpFetch(requestUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody),
+            signal: controller.signal
+          });
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            throw new Error('GraphHopper request timed out after 10000ms');
+          }
+          throw error;
+        } finally {
+          clearTimeout(timeout);
+        }
+
+        let parsedPayload: GraphHopperResponse = {};
+        try {
+          parsedPayload = (await response.json()) as GraphHopperResponse;
+        } catch {
+          parsedPayload = {};
+        }
+
+        if (isUnsupportedPathDetailsError(parsedPayload) && details.length > 0) {
+          lastFailureMessage = `GraphHopper does not support requested details (${details.join(', ')}), retrying`;
+          continue;
+        }
+
+        if (customModel && isUnsupportedCustomModelError(parsedPayload)) {
+          shouldTryWithoutCustomModel = true;
+          lastFailureMessage = 'GraphHopper rejected custom_model, retrying without it';
+          break;
+        }
+
+        if (!response.ok) {
+          throw new Error(buildGraphHopperErrorMessage(parsedPayload, response.status));
+        }
+
+        if (parsedPayload.paths?.length) {
+          foundPathsForCurrentModel = true;
+          const currentPathCount = parsedPayload.paths.length;
+          const selectedPathCount = payload?.paths?.length ?? 0;
+          const canReplaceCurrentSelection = customModel
+            ? !usedCustomModel || currentPathCount > selectedPathCount
+            : !usedCustomModel && currentPathCount > selectedPathCount;
+
+          if (!payload || canReplaceCurrentSelection) {
+            payload = parsedPayload;
+            selectedRequestUrl = requestUrl;
+            usedCustomModel = Boolean(customModel);
+          }
+
+          if (currentPathCount >= TARGET_ROUTE_PATH_COUNT) {
+            stopSearch = true;
+            break;
+          }
+
+          lastFailureMessage = `GraphHopper returned ${currentPathCount} route path(s), trying fallback strategy`;
+          continue;
+        }
+
+        if (parsedPayload.message) {
+          throw new Error(buildGraphHopperErrorMessage(parsedPayload, response.status));
+        }
+
+        lastFailureMessage = 'GraphHopper returned no route paths';
       }
 
-      let parsedPayload: GraphHopperResponse = {};
-      try {
-        parsedPayload = (await response.json()) as GraphHopperResponse;
-      } catch {
-        parsedPayload = {};
-      }
-
-      if (isUnsupportedPathDetailsError(parsedPayload) && details.length > 0) {
-        lastFailureMessage = `GraphHopper does not support requested details (${details.join(', ')}), retrying`;
-        continue;
-      }
-
-      if (!response.ok) {
-        throw new Error(buildGraphHopperErrorMessage(parsedPayload, response.status));
-      }
-
-      if (parsedPayload.paths?.length) {
-        payload = parsedPayload;
+      if (customModel && foundPathsForCurrentModel && !shouldTryWithoutCustomModel) {
         break;
       }
-
-      if (parsedPayload.message) {
-        throw new Error(buildGraphHopperErrorMessage(parsedPayload, response.status));
+      if (payload?.paths?.length) {
+        if (stopSearch) {
+          break;
+        }
       }
-
-      lastFailureMessage = 'GraphHopper returned no route paths';
+      if (shouldTryWithoutCustomModel) {
+        continue;
+      }
+      if (stopSearch) {
+        break;
+      }
     }
 
     if (!payload?.paths?.length) {
       throw new Error(lastFailureMessage);
     }
 
-    return payload.paths.slice(0, 3).map((path, index) => {
+    return payload.paths.map((path, index) => {
       const geometry = path.points?.coordinates ?? [
         [input.start.lng, input.start.lat],
         [endPoint.lng, endPoint.lat]
@@ -464,7 +614,7 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
       const segments = buildSegmentsFromPathDetails(path, index);
       const surfaceMix = buildSurfaceMixFromSegments(segments);
 
-      const sourceUrl = new URL(requestUrl);
+      const sourceUrl = new URL(selectedRequestUrl || requestUrl);
       sourceUrl.search = '';
 
       return {
@@ -482,7 +632,7 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
           profile,
           source: sourceUrl.toString(),
           hasSurfaceDetails: Boolean(path.details?.surface?.length),
-          // TODO: map sliders to GraphHopper custom_model for route personalization.
+          customModelApplied: usedCustomModel,
           // TODO: improve alternative route generation strategy (distance/time diversity constraints).
           // TODO: support region-aware OSM extract switching and periodic refresh jobs.
         }

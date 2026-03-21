@@ -8,11 +8,13 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "docker:up": "docker compose -f infra/docker-compose.yml up -d",
-    "docker:down": "docker compose -f infra/docker-compose.yml down",
+    "docker:up": "docker compose --env-file infra/.osm-region.env -f infra/docker-compose.yml up -d",
+    "docker:down": "docker compose --env-file infra/.osm-region.env -f infra/docker-compose.yml down",
     "db:migrate": "pnpm --filter @adventure/api prisma:migrate",
     "db:seed": "pnpm --filter @adventure/api prisma:seed",
-    "fetch:osm": "bash infra/scripts/fetch-vermont-osm.sh"
+    "fetch:osm": "bash infra/scripts/fetch-osm.sh https://download.geofabrik.de/north-america/us/vermont-latest.osm.pbf vermont-latest.osm.pbf",
+    "fetch:osm:url": "bash infra/scripts/fetch-osm.sh",
+    "osm:use": "bash infra/scripts/use-osm-region.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

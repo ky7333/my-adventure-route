@@ -1,5 +1,7 @@
 import type { KeyboardEvent } from 'react';
 import type { RouteAlternative } from '@adventure/contracts';
+import { formatRouteDistance } from '../lib/formatDistance';
+import { formatRouteDuration } from '../lib/formatDuration';
 
 interface RouteOptionsPanelProps {
   options: RouteAlternative[];
@@ -43,7 +45,7 @@ export function RouteOptionsPanel({
             onClick={() => onSelect(option.id)}
           >
             <span className="route-chip-rank">Route {option.rank}</span>
-            <span className="route-chip-time">{option.durationMin.toFixed(0)} min</span>
+            <span className="route-chip-time">{formatRouteDuration(option.durationMin)}</span>
           </button>
         ))}
       </div>
@@ -66,10 +68,10 @@ export function RouteOptionsPanel({
             >
               <div className="route-card-head">
                 <div className="route-card-title">#{option.rank} {option.label}</div>
-                <span className="route-card-time">{option.durationMin.toFixed(0)} min</span>
+                <span className="route-card-time">{formatRouteDuration(option.durationMin)}</span>
               </div>
               <div className="route-quick-stats">
-                <span>{option.distanceKm.toFixed(1)} km</span>
+                <span>{formatRouteDistance(option.distanceKm)}</span>
                 <span>Twistiness: {option.twistinessScore.toFixed(0)}</span>
                 <span>Difficulty: {option.difficultyScore.toFixed(0)}</span>
               </div>

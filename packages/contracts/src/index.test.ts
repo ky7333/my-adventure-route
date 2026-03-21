@@ -6,30 +6,132 @@ import {
   surfaceMixSchema
 } from './index';
 
+const basePlanRequest = {
+  start: { label: 'A', lat: 44.4, lng: -72.7 },
+  end: { label: 'B', lat: 44.5, lng: -72.6 },
+  loopRide: false,
+  vehicleType: 'motorcycle' as const,
+  preferences: {
+    curvy: 50,
+    scenic: 50,
+    avoidHighways: 50,
+    unpavedPreference: 50,
+    difficulty: 50,
+    distanceInfluence: 18
+  }
+};
+
+type PlanRequestOverrides = Partial<Omit<typeof basePlanRequest, 'preferences'>> & {
+  preferences?: Partial<typeof basePlanRequest.preferences>;
+};
+
+function makePlanRequest(overrides: PlanRequestOverrides = {}) {
+  return {
+    ...basePlanRequest,
+    ...overrides,
+    preferences: {
+      ...basePlanRequest.preferences,
+      ...(overrides.preferences ?? {})
+    }
+  };
+}
+
 describe('planRouteRequestSchema', () => {
   it('rejects point-to-point route without end location', () => {
-    const parsed = planRouteRequestSchema.safeParse({
-      start: { label: 'A', lat: 44.4, lng: -72.7 },
-      loopRide: false,
-      vehicleType: 'motorcycle',
-      preferences: {
-        curvy: 50,
-        scenic: 50,
-        avoidHighways: 50,
-        unpavedPreference: 50,
-        difficulty: 50
-      }
-    });
+    const parsed = planRouteRequestSchema.safeParse(
+      makePlanRequest({
+        end: undefined
+      })
+    );
 
     expect(parsed.success).toBe(false);
   });
 
   it('rejects loop routes when end is provided', () => {
+    const parsed = planRouteRequestSchema.safeParse(
+      makePlanRequest({
+        loopRide: true
+      })
+    );
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it('accepts valid point-to-point route with distanceInfluence', () => {
+    const parsed = planRouteRequestSchema.safeParse(
+      makePlanRequest({
+        preferences: {
+          distanceInfluence: 24
+        }
+      })
+    );
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it('accepts distanceInfluence at min and max boundaries', () => {
+    const minParsed = planRouteRequestSchema.safeParse(
+      makePlanRequest({
+        preferences: {
+          distanceInfluence: 15
+        }
+      })
+    );
+    const maxParsed = planRouteRequestSchema.safeParse(
+      makePlanRequest({
+        preferences: {
+          distanceInfluence: 100
+        }
+      })
+    );
+
+    expect(minParsed.success).toBe(true);
+    expect(maxParsed.success).toBe(true);
+  });
+
+  it('rejects out-of-range distanceInfluence values', () => {
+    const belowMin = planRouteRequestSchema.safeParse(
+      makePlanRequest({
+        preferences: {
+          distanceInfluence: 14
+        }
+      })
+    );
+    const aboveMax = planRouteRequestSchema.safeParse(
+      makePlanRequest({
+        preferences: {
+          distanceInfluence: 101
+        }
+      })
+    );
+
+    expect(belowMin.success).toBe(false);
+    expect(aboveMax.success).toBe(false);
+  });
+
+  it('rejects invalid distanceInfluence types', () => {
+    const stringValue = planRouteRequestSchema.safeParse(
+      makePlanRequest({
+        preferences: {
+          distanceInfluence: '18' as unknown as number
+        }
+      })
+    );
+    const nullValue = planRouteRequestSchema.safeParse(
+      makePlanRequest({
+        preferences: {
+          distanceInfluence: null as unknown as number
+        }
+      })
+    );
+
+    expect(stringValue.success).toBe(false);
+    expect(nullValue.success).toBe(false);
+  });
+
+  it('defaults distanceInfluence when omitted from preferences', () => {
     const parsed = planRouteRequestSchema.safeParse({
-      start: { label: 'A', lat: 44.4, lng: -72.7 },
-      end: { label: 'B', lat: 44.5, lng: -72.6 },
-      loopRide: true,
-      vehicleType: 'motorcycle',
+      ...makePlanRequest(),
       preferences: {
         curvy: 50,
         scenic: 50,
@@ -39,7 +141,10 @@ describe('planRouteRequestSchema', () => {
       }
     });
 
-    expect(parsed.success).toBe(false);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.preferences.distanceInfluence).toBe(18);
+    }
   });
 
   it('rejects surface sections where startCoordinateIndex is greater than or equal to endCoordinateIndex', () => {

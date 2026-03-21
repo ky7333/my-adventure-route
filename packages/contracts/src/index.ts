@@ -15,7 +15,8 @@ export const routePreferencesSchema = z.object({
   scenic: z.number().min(0).max(100),
   avoidHighways: z.number().min(0).max(100),
   unpavedPreference: z.number().min(0).max(100),
-  difficulty: z.number().min(0).max(100)
+  difficulty: z.number().min(0).max(100),
+  distanceInfluence: z.number().min(15).max(100).default(18)
 });
 export type RoutePreferences = z.infer<typeof routePreferencesSchema>;
 

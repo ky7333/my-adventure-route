@@ -1,10 +1,9 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { AppLayout } from './components/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { PlanPage } from './pages/PlanPage';
-import { ResultsPage } from './pages/ResultsPage';
 import { SignupPage } from './pages/SignupPage';
 
 export function App() {
@@ -26,7 +25,7 @@ export function App() {
           path="/results/:routeRequestId"
           element={
             <ProtectedRoute>
-              <ResultsPage />
+              <LegacyResultsRedirect />
             </ProtectedRoute>
           }
         />
@@ -34,4 +33,12 @@ export function App() {
       </Routes>
     </AppLayout>
   );
+}
+
+function LegacyResultsRedirect() {
+  const { routeRequestId } = useParams<{ routeRequestId: string }>();
+  const encodedId = routeRequestId ? encodeURIComponent(routeRequestId) : '';
+  const search = encodedId ? `?routeRequestId=${encodedId}` : '';
+
+  return <Navigate to={`/plan${search}`} replace />;
 }

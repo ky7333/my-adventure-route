@@ -68,10 +68,44 @@ Warning: local seed data only. Use a non-default password and remove or disable 
 ## Notes on routing provider
 `apps/api/.env` controls provider selection:
 - `ROUTING_PROVIDER=mock` for fast local development
-- `ROUTING_PROVIDER=graphhopper` to call local GraphHopper
+- `ROUTING_PROVIDER=graphhopper` to call GraphHopper
+- `GRAPHHOPPER_SOURCE=local` for Docker/local GraphHopper (default base URL: `http://localhost:8989`)
+- `GRAPHHOPPER_SOURCE=cloud` for graphhopper.com (default base URL: `https://graphhopper.com/api/1`)
+- `GRAPHHOPPER_API_KEY` is required when `GRAPHHOPPER_SOURCE=cloud`
 - Optional `CORS_ORIGINS` can be set to a comma-separated allowlist for non-local frontend origins.
 
+Example cloud config:
+```bash
+ROUTING_PROVIDER=graphhopper
+GRAPHHOPPER_SOURCE=cloud
+GRAPHHOPPER_BASE_URL=https://graphhopper.com/api/1
+GRAPHHOPPER_API_KEY=your_graphhopper_account_key
+GRAPHHOPPER_PROFILE=car
+```
+
 The system returns 1 to 3 ranked routes depending on provider availability.
+
+## Switching Local OSM Region
+Use these commands to test other areas with local GraphHopper:
+
+1. Download and select a region:
+   ```bash
+   pnpm osm:use -- https://download.geofabrik.de/north-america/us/new-york-latest.osm.pbf new-york
+   ```
+2. Restart infrastructure so GraphHopper imports/reuses the selected graph cache:
+   ```bash
+   pnpm docker:down
+   pnpm docker:up
+   ```
+
+Region selection is stored in `infra/.osm-region.env` via:
+- `OSM_PBF_FILE` (input `.osm.pbf` in `infra/data/osm`)
+- `OSM_GRAPH_CACHE` (graph cache folder under `infra/data/graphhopper`)
+
+Download-only helper (without switching):
+```bash
+pnpm fetch:osm:url -- <osm_url> [output_filename]
+```
 
 ## TODOs for real routing quality
 - Map sliders to GraphHopper `custom_model` settings.
@@ -108,11 +142,11 @@ pnpm --filter @adventure/web test
 - If surface still appears missing, force a full graph rebuild (this is required when encoded values change):
   ```bash
   pnpm docker:down
-  rm -rf infra/data/graphhopper/adventure-vt-gh
+  rm -rf infra/data/graphhopper/<your_selected_graph_cache>
   pnpm docker:up
   ```
 - Optional validation after rebuild:
-  - Check `infra/data/graphhopper/adventure-vt-gh/properties.txt` contains `surface` under `graph.encoded_values`.
+  - Check `infra/data/graphhopper/<your_selected_graph_cache>/properties.txt` contains `surface` under `graph.encoded_values`.
 - First GraphHopper import can take several minutes; subsequent runs should be faster due to cache.
 - If Prisma migration fails, verify Postgres is running on `localhost:5432`.
 

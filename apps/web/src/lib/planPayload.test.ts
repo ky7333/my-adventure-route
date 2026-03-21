@@ -16,7 +16,8 @@ describe('toPlanRoutePayload', () => {
       scenic: 65,
       avoidHighways: 70,
       unpavedPreference: 55,
-      difficulty: 55
+      difficulty: 55,
+      distanceInfluence: 18
     }
   };
   const makePlanInput = (overrides: Partial<PlanFormValues> = {}): PlanFormValues => ({
@@ -36,7 +37,8 @@ describe('toPlanRoutePayload', () => {
         scenic: 75,
         avoidHighways: 80,
         unpavedPreference: 45,
-        difficulty: 50
+        difficulty: 50,
+        distanceInfluence: 18
       }
     }));
 

@@ -12,7 +12,8 @@ describe('DefaultRouteScoringEngine', () => {
         scenic: 80,
         avoidHighways: 70,
         unpavedPreference: 60,
-        difficulty: 65
+        difficulty: 65,
+        distanceInfluence: 18
       },
       segments: [
         {

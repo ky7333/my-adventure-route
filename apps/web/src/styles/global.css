@@ -293,11 +293,148 @@ select {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
+  overflow: visible;
   pointer-events: none;
 }
 
 .floating-route-panel > * {
   pointer-events: auto;
+}
+
+.planner-float-card {
+  background: #ffffffeb;
+  border: 1px solid #d6d9de;
+  border-radius: 16px;
+  box-shadow: 0 10px 26px #0000001f;
+  padding: 0.75rem 0.8rem;
+  max-height: 100%;
+  display: grid;
+  gap: 0.65rem;
+  overflow: auto;
+}
+
+.planner-float-card h1 {
+  font-size: 0.92rem;
+  margin: 0 0 0.4rem;
+}
+
+.planner-hint {
+  font-size: 0.78rem;
+  margin: 0 0 0.6rem;
+}
+
+.planner-grid--floating {
+  gap: 0.55rem;
+}
+
+.planner-grid--floating label {
+  gap: 0.25rem;
+  font-size: 0.82rem;
+}
+
+.planner-grid--floating input,
+.planner-grid--floating select {
+  padding: 0.45rem 0.55rem;
+}
+
+.planner-grid--floating input[type="range"] {
+  width: 100%;
+}
+
+.planner-grid--floating .checkbox-row {
+  font-size: 0.8rem;
+}
+
+.preferences-compact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.preference-slider {
+  display: grid;
+  gap: 0.25rem;
+  border: 1px solid #d7dde4;
+  border-radius: 10px;
+  background: #f9fbfd;
+  padding: 0.35rem 0.5rem;
+}
+
+.preference-slider-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.preference-slider-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.preference-slider-value {
+  border: 1px solid #d5dce6;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #39485a;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.14rem 0.4rem;
+}
+
+.preference-slider input[type="range"] {
+  margin: 0;
+}
+
+.profile-preset-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  border: 1px solid #d7dde4;
+  border-radius: 10px;
+  background: #f9fbfd;
+  padding: 0.5rem 0.6rem;
+}
+
+.planner-submit {
+  margin-top: 0.15rem;
+  width: 100%;
+}
+
+.planner-results-section {
+  display: grid;
+  gap: 0.55rem;
+  border-top: 1px solid #d9dee4;
+  padding-top: 0.6rem;
+}
+
+.planner-results-section h2 {
+  font-size: 0.92rem;
+  margin: 0;
+}
+
+.planner-results-section .muted {
+  margin: 0;
+}
+
+.planner-float-card .planner-results-section .results-panel {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  min-height: 0;
+  overflow: visible;
+}
+
+.planner-float-card .planner-results-section .route-options-grid {
+  overflow: visible;
+  padding-right: 0;
 }
 
 .from-to-card {
@@ -308,9 +445,14 @@ select {
   padding: 0.75rem 0.8rem;
 }
 
-.from-to-card h1 {
+.from-to-card h1,
+.from-to-card h2 {
   font-size: 0.92rem;
   margin: 0 0 0.55rem;
+}
+
+.route-summary-card .muted {
+  margin: 0;
 }
 
 .from-to-lines {
@@ -372,6 +514,7 @@ select {
 .floating-route-panel .results-panel {
   margin: 0;
   display: flex;
+  flex: 1;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
@@ -623,6 +766,10 @@ select {
 @media (max-width: 900px) {
   .app-shell--map {
     height: 100dvh;
+  }
+
+  .preferences-compact-grid {
+    grid-template-columns: 1fr;
   }
 
   .floating-route-panel {

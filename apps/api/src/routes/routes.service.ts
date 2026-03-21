@@ -113,6 +113,78 @@ function calculateSurfaceMix(candidate: RawRouteCandidate): SurfaceMix {
   });
 }
 
+function getUnpavedPercent(surfaceMix: SurfaceMix): number {
+  return surfaceMix.gravelPercent + surfaceMix.dirtPercent;
+}
+
+function selectTopCandidatesWithDiversity(
+  candidates: Array<
+    RawRouteCandidate & {
+      surfaceMix: SurfaceMix;
+      score: RouteAlternative['score'];
+      twistinessScore: number;
+      difficultyScore: number;
+      surfaceSections: RouteSurfaceSection[];
+    }
+  >,
+  preferences: PlanRouteRequest['preferences']
+): Array<
+  RawRouteCandidate & {
+    surfaceMix: SurfaceMix;
+    score: RouteAlternative['score'];
+    twistinessScore: number;
+    difficultyScore: number;
+    surfaceSections: RouteSurfaceSection[];
+  }
+> {
+  const providerOrderedCandidates = candidates.every((candidate) => {
+    const provider = (candidate.providerMeta as Record<string, unknown> | undefined)?.provider;
+    return typeof provider === 'string' && provider.toLowerCase() === 'graphhopper';
+  });
+
+  const sortedByScore = [...candidates].sort((a, b) => b.score.total - a.score.total);
+  if (sortedByScore.length <= 3) {
+    return providerOrderedCandidates ? candidates : sortedByScore;
+  }
+
+  const selected: typeof sortedByScore = [];
+  const primary = sortedByScore[0];
+  if (!primary) {
+    return [];
+  }
+  selected.push(primary);
+
+  const remaining = sortedByScore.slice(1);
+  const highestUnpaved = [...remaining].sort((a, b) => {
+    const unpavedDiff = getUnpavedPercent(b.surfaceMix) - getUnpavedPercent(a.surfaceMix);
+    if (unpavedDiff !== 0) {
+      return unpavedDiff;
+    }
+    return b.score.total - a.score.total;
+  })[0];
+
+  const primaryUnpaved = getUnpavedPercent(primary.surfaceMix);
+  const shouldPromoteUnpaved =
+    preferences.unpavedPreference >= 55 ||
+    (highestUnpaved ? getUnpavedPercent(highestUnpaved.surfaceMix) - primaryUnpaved >= 10 : false);
+
+  if (shouldPromoteUnpaved && highestUnpaved) {
+    selected.push(highestUnpaved);
+  }
+
+  for (const candidate of sortedByScore) {
+    if (selected.length >= 3) {
+      break;
+    }
+    if (selected.includes(candidate)) {
+      continue;
+    }
+    selected.push(candidate);
+  }
+
+  return selected.slice(0, 3);
+}
+
 function dominantSurfaceFromMix(surfaceMix: RawRouteCandidate['surfaceMix']): RouteSurfaceType {
   const ranked: Array<{ surface: RouteSurfaceType; value: number }> = [
     { surface: 'paved', value: surfaceMix.pavedPercent },
@@ -253,11 +325,11 @@ export class RoutesService {
           difficultyScore: score.difficulty,
           surfaceSections
         };
-      })
-      .sort((a, b) => b.score.total - a.score.total)
-      .slice(0, 3);
+      });
 
-    if (scoredCandidates.length === 0) {
+    const selectedCandidates = selectTopCandidatesWithDiversity(scoredCandidates, input.preferences);
+
+    if (selectedCandidates.length === 0) {
       throw new NotFoundException('No route candidates were generated.');
     }
 
@@ -274,7 +346,7 @@ export class RoutesService {
         vehicleType: input.vehicleType,
         preferences: input.preferences as Prisma.InputJsonValue,
         options: {
-          create: scoredCandidates.map((candidate, index) => ({
+          create: selectedCandidates.map((candidate, index) => ({
             rank: index + 1,
             label: candidate.label,
             distanceKm: candidate.distanceKm,

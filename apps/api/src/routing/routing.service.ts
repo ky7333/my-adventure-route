@@ -92,6 +92,11 @@ function getFlavorForRank(rank: number): DerivedFlavor {
   return rank === 2 ? 'faster' : 'curvier';
 }
 
+function isRoadAwarePrimaryCandidate(candidate: RawRouteCandidate): boolean {
+  const provider = candidate.providerMeta?.provider;
+  return typeof provider === 'string' && provider.toLowerCase() !== 'mock';
+}
+
 @Injectable()
 export class RoutingService {
   private readonly logger = new Logger(RoutingService.name);
@@ -106,6 +111,11 @@ export class RoutingService {
 
     if (primaryCandidates.length >= TARGET_CANDIDATE_COUNT) {
       return primaryCandidates.slice(0, TARGET_CANDIDATE_COUNT);
+    }
+
+    // Keep real provider geometries intact. Synthetic geometry perturbations can drift off-road.
+    if (primaryCandidates.length > 0 && primaryCandidates.every(isRoadAwarePrimaryCandidate)) {
+      return primaryCandidates;
     }
 
     const derivedCandidates = this.deriveAlternatives(primaryCandidates);
