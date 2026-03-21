@@ -6,10 +6,11 @@ import {
   Inject,
   Param,
   Post,
+  Query,
   Req,
   UseGuards
 } from '@nestjs/common';
-import { planRouteRequestSchema } from '@adventure/contracts';
+import { geocodeSearchQuerySchema, planRouteRequestSchema } from '@adventure/contracts';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RoutesService } from './routes.service';
@@ -34,6 +35,16 @@ export class RoutesController {
     }
 
     return this.routesService.planRoute(req.user.userId, parsed.data);
+  }
+
+  @Get('geocode')
+  async geocode(@Query() query: unknown) {
+    const parsed = geocodeSearchQuerySchema.safeParse(query);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.flatten());
+    }
+
+    return this.routesService.geocodeAddress(parsed.data.q, parsed.data.limit);
   }
 
   @Get(':id')

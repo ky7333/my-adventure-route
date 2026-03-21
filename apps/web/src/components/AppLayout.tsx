@@ -17,7 +17,7 @@ export function AppLayout({ children }: PropsWithChildren) {
     <div className={`app-shell ${isMapLayout ? 'app-shell--map' : ''}`}>
       <header className={`site-header ${isMapLayout ? 'site-header--map' : ''}`}>
         <Link to="/" className="brand">
-          Adventure Route
+          My Adventure Route
         </Link>
         <nav className="site-nav">
           <Link to="/plan">Plan Route</Link>

@@ -12,6 +12,11 @@ interface RouteMapProps {
     bottom: number;
     left: number;
   };
+  onMapCoordinateSelect?: (selection: {
+    target: 'start' | 'end';
+    lat: number;
+    lng: number;
+  }) => void;
 }
 
 const SURFACE_COLORS: Record<RouteSurfaceType, string> = {
@@ -141,13 +146,19 @@ const DEFAULT_FIT_PADDING = {
   left: 40
 };
 
-export function RouteMap({ options, selectedRouteId, fitPadding }: RouteMapProps) {
+export function RouteMap({ options, selectedRouteId, fitPadding, onMapCoordinateSelect }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const maplibreRef = useRef<MapLibreGlobal | null>(null);
   const lastFittedRouteIdRef = useRef<string | null>(null);
   const lastFitPaddingKeyRef = useRef<string | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    lat: number;
+    lng: number;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -205,6 +216,57 @@ export function RouteMap({ options, selectedRouteId, fitPadding }: RouteMapProps
       setIsMapReady(false);
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReady || !onMapCoordinateSelect) {
+      return;
+    }
+
+    interface ContextMenuEvent {
+      point?: {
+        x: number;
+        y: number;
+      };
+      lngLat?: {
+        lng: number;
+        lat: number;
+      };
+      originalEvent?: Event;
+    }
+
+    const hideContextMenu = (): void => {
+      setContextMenu(null);
+    };
+
+    const handleContextMenu = (event: ContextMenuEvent): void => {
+      event.originalEvent?.preventDefault();
+      const point = event.point;
+      const lngLat = event.lngLat;
+      if (!point || !lngLat) {
+        return;
+      }
+
+      setContextMenu({
+        x: Math.round(point.x),
+        y: Math.round(point.y),
+        lng: lngLat.lng,
+        lat: lngLat.lat
+      });
+    };
+
+    map.on('contextmenu', handleContextMenu);
+    map.on('click', hideContextMenu);
+    map.on('movestart', hideContextMenu);
+    map.on('dragstart', hideContextMenu);
+
+    return () => {
+      map.off('contextmenu', handleContextMenu);
+      map.off('click', hideContextMenu);
+      map.off('movestart', hideContextMenu);
+      map.off('dragstart', hideContextMenu);
+    };
+  }, [isMapReady, onMapCoordinateSelect]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -385,6 +447,42 @@ export function RouteMap({ options, selectedRouteId, fitPadding }: RouteMapProps
   return (
     <div className="route-map-shell">
       <div className="route-map" ref={containerRef} />
+      {contextMenu && onMapCoordinateSelect ? (
+        <div
+          className="map-context-menu"
+          style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
+          role="menu"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onMapCoordinateSelect({
+                target: 'start',
+                lat: contextMenu.lat,
+                lng: contextMenu.lng
+              });
+              setContextMenu(null);
+            }}
+          >
+            Set as Start
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onMapCoordinateSelect({
+                target: 'end',
+                lat: contextMenu.lat,
+                lng: contextMenu.lng
+              });
+              setContextMenu(null);
+            }}
+          >
+            Set as End
+          </button>
+        </div>
+      ) : null}
       <div className="surface-legend">
         <span className="legend-item">
           <i className="legend-swatch legend-paved" />

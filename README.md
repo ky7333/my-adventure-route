@@ -62,6 +62,7 @@ Warning: local seed data only. Use a non-default password and remove or disable 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `GET /api/health`
+- `GET /api/routes/geocode?q=<address>&limit=<1-10>` (auth required)
 - `POST /api/routes/plan` (auth required)
 - `GET /api/routes/:id` (auth required)
 
@@ -71,6 +72,7 @@ Warning: local seed data only. Use a non-default password and remove or disable 
 - `ROUTING_PROVIDER=graphhopper` to call GraphHopper
 - `GRAPHHOPPER_SOURCE=local` for Docker/local GraphHopper (default base URL: `http://localhost:8989`)
 - `GRAPHHOPPER_SOURCE=cloud` for graphhopper.com (default base URL: `https://graphhopper.com/api/1`)
+- Optional `PHOTON_BASE_URL` override for Photon geocoding base URL
 - `GRAPHHOPPER_API_KEY` is required when `GRAPHHOPPER_SOURCE=cloud`
 - Optional `CORS_ORIGINS` can be set to a comma-separated allowlist for non-local frontend origins.
 
@@ -84,6 +86,7 @@ GRAPHHOPPER_PROFILE=car
 ```
 
 The system returns 1 to 3 ranked routes depending on provider availability.
+Geocoding uses Photon (`https://photon.komoot.io/api`) through the API.
 
 ## Switching Local OSM Region
 Use these commands to test other areas with local GraphHopper:
