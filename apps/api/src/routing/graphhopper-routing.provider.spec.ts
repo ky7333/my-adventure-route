@@ -46,7 +46,7 @@ describe('GraphHopperRoutingProvider', () => {
       })
     } as unknown as ConfigService;
 
-    const fetchMock = vi.fn().mockResolvedValue(
+    const buildSuccessResponse = () =>
       new Response(
         JSON.stringify({
           paths: [
@@ -63,8 +63,9 @@ describe('GraphHopperRoutingProvider', () => {
           ]
         }),
         { status: 200 }
-      )
-    );
+      );
+
+    const fetchMock = vi.fn().mockImplementation(async () => buildSuccessResponse());
 
     const provider = new GraphHopperRoutingProvider(configService);
     provider.setHttpFetchForTesting(fetchMock as unknown as typeof fetch);
@@ -260,6 +261,101 @@ describe('GraphHopperRoutingProvider', () => {
     expect(result[0].surfaceMix.gravelPercent).toBe(0);
     expect(result[0].surfaceMix.unknownPercent).toBe(100);
     expect(result[0].providerMeta.customModelApplied).toBe(true);
+  });
+
+  it('keeps paved surface penalty independent from avoidHighways', async () => {
+    const configService = {
+      get: vi.fn((key: string, fallback: string) => {
+        const map: Record<string, string> = {
+          GRAPHHOPPER_BASE_URL: 'http://localhost:8989',
+          GRAPHHOPPER_PROFILE: 'car',
+          GRAPHHOPPER_API_KEY: ''
+        };
+        return map[key] ?? fallback;
+      })
+    } as unknown as ConfigService;
+
+    const buildSuccessResponse = () =>
+      new Response(
+        JSON.stringify({
+          paths: [
+            {
+              distance: 100000,
+              time: 7200000,
+              points: {
+                coordinates: [
+                  [-72.7, 44.4],
+                  [-72.1, 44.8]
+                ]
+              }
+            }
+          ]
+        }),
+        { status: 200 }
+      );
+
+    const lowAvoidFetchMock = vi.fn().mockImplementation(async () => buildSuccessResponse());
+    const lowAvoidProvider = new GraphHopperRoutingProvider(configService);
+    lowAvoidProvider.setHttpFetchForTesting(lowAvoidFetchMock as unknown as typeof fetch);
+
+    await lowAvoidProvider.planCandidates({
+      start: { label: 'A', lat: 44.4, lng: -72.7 },
+      end: { label: 'B', lat: 44.8, lng: -72.1 },
+      loopRide: false,
+      vehicleType: '4x4',
+      preferences: {
+        curvy: 80,
+        scenic: 60,
+        avoidHighways: 20,
+        unpavedPreference: 40,
+        difficulty: 40,
+        distanceInfluence: 18
+      }
+    });
+
+    const highAvoidFetchMock = vi.fn().mockImplementation(async () => buildSuccessResponse());
+    const highAvoidProvider = new GraphHopperRoutingProvider(configService);
+    highAvoidProvider.setHttpFetchForTesting(highAvoidFetchMock as unknown as typeof fetch);
+
+    await highAvoidProvider.planCandidates({
+      start: { label: 'A', lat: 44.4, lng: -72.7 },
+      end: { label: 'B', lat: 44.8, lng: -72.1 },
+      loopRide: false,
+      vehicleType: '4x4',
+      preferences: {
+        curvy: 80,
+        scenic: 60,
+        avoidHighways: 90,
+        unpavedPreference: 40,
+        difficulty: 40,
+        distanceInfluence: 18
+      }
+    });
+
+    const lowAvoidRequest = parseFetchCall(lowAvoidFetchMock.mock.calls[0] as unknown[]);
+    const highAvoidRequest = parseFetchCall(highAvoidFetchMock.mock.calls[0] as unknown[]);
+
+    const lowAvoidModel = lowAvoidRequest.body.custom_model as {
+      priority?: Array<{ if: string; multiply_by: string }>;
+    };
+    const highAvoidModel = highAvoidRequest.body.custom_model as {
+      priority?: Array<{ if: string; multiply_by: string }>;
+    };
+
+    const lowPavedFactor = lowAvoidModel.priority?.find((entry) => entry.if === 'surface == PAVED')?.multiply_by;
+    const highPavedFactor = highAvoidModel.priority?.find((entry) => entry.if === 'surface == PAVED')
+      ?.multiply_by;
+    const lowMotorwayFactor = lowAvoidModel.priority?.find((entry) => entry.if === 'road_class == MOTORWAY')
+      ?.multiply_by;
+    const highMotorwayFactor = highAvoidModel.priority?.find((entry) => entry.if === 'road_class == MOTORWAY')
+      ?.multiply_by;
+
+    expect(lowPavedFactor).toBeTruthy();
+    expect(highPavedFactor).toBeTruthy();
+    expect(lowPavedFactor).toBe(highPavedFactor);
+    expect(lowMotorwayFactor).toBeTruthy();
+    expect(highMotorwayFactor).toBeTruthy();
+    expect(lowMotorwayFactor).not.toBe(highMotorwayFactor);
   });
 
   it('uses GraphHopper surface path details when present', async () => {

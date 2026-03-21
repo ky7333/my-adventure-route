@@ -226,8 +226,11 @@ function toFactor(value: number): string {
 
 function buildCustomModel(preferences: PlanRouteRequest['preferences']): GraphHopperCustomModel {
   const avoidHighwaysRatio = clamp(preferences.avoidHighways / 100, 0, 1);
+  const unpavedRatio = clamp(preferences.unpavedPreference / 100, 0, 1);
   // Aggressive curve so mid-high slider values already strongly avoid major roads.
   const aggressiveAvoidCurve = Math.pow(avoidHighwaysRatio, 0.65);
+  // Keep off-pavement preference independent from highway avoidance.
+  const aggressiveUnpavedCurve = Math.pow(unpavedRatio, 0.8);
   const motorwayPenalty = clamp(0.08 - aggressiveAvoidCurve * 0.1, 0.01, 0.08);
   const trunkPenalty = clamp(0.25 - aggressiveAvoidCurve * 0.28, 0.01, 0.25);
   const primaryPenalty = clamp(0.45 - aggressiveAvoidCurve * 0.4, 0.03, 0.45);
@@ -242,6 +245,7 @@ function buildCustomModel(preferences: PlanRouteRequest['preferences']): GraphHo
     0.9,
     1
   );
+  const pavedPenalty = clamp(1 - aggressiveUnpavedCurve * 0.75, 0.25, 1);
   const distanceInfluence = Math.round(clamp(preferences.distanceInfluence, 15, 100));
 
   return {
@@ -253,7 +257,7 @@ function buildCustomModel(preferences: PlanRouteRequest['preferences']): GraphHo
       { if: 'road_class == SECONDARY', multiply_by: toFactor(secondaryPenalty) },
       { if: 'road_class == TERTIARY', multiply_by: toFactor(tertiaryPenalty) },
       { if: 'road_class == TRACK', multiply_by: toFactor(trackPenalty) },
-      { if: 'surface == PAVED', multiply_by: toFactor(1-avoidHighwaysRatio) }
+      { if: 'surface == PAVED', multiply_by: toFactor(pavedPenalty) }
     ]
   };
 }

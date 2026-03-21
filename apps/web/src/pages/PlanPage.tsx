@@ -110,6 +110,21 @@ function resolveRoutePreferenceProfile(preferences: RoutePreferences): RoutePref
   return matched?.id ?? CUSTOM_ROUTE_PROFILE_ID;
 }
 
+function toErrorMessage(error: unknown): string {
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) {
+      return message;
+    }
+  }
+
+  return 'Unexpected error while planning route';
+}
+
 export function PlanPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const routeRequestId = searchParams.get('routeRequestId');
@@ -191,7 +206,7 @@ export function PlanPage() {
         if (!isMounted) {
           return;
         }
-        setError((requestError as Error).message);
+        setError(toErrorMessage(requestError));
         setRouteDetail(null);
         setSelectedRouteId(null);
       })
@@ -320,7 +335,7 @@ export function PlanPage() {
       nextParams.set('routeRequestId', response.routeRequestId);
       setSearchParams(nextParams);
     } catch (submissionError) {
-      setError((submissionError as Error).message);
+      setError(toErrorMessage(submissionError));
     } finally {
       setIsSubmitting(false);
     }
