@@ -549,17 +549,22 @@ export class RoutesService {
     endpoint.searchParams.set('lang', 'en');
 
     let response: Response;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     try {
       response = await fetch(endpoint, {
         headers: {
           Accept: 'application/json'
-        }
+        },
+        signal: controller.signal
       });
     } catch (error) {
       this.logger.warn(
         `Photon geocode request failed (${endpoint.origin}): ${(error as Error).message}`
       );
       throw new ServiceUnavailableException('Photon geocoding is unavailable. Please try again.');
+    } finally {
+      clearTimeout(timeout);
     }
 
     if (!response.ok) {
@@ -569,7 +574,13 @@ export class RoutesService {
       throw new ServiceUnavailableException('Photon geocoding is unavailable. Please try again.');
     }
 
-    const payload = (await response.json().catch(() => ({}))) as PhotonGeocodeResponse;
+    let payload: PhotonGeocodeResponse;
+    try {
+      payload = (await response.json()) as PhotonGeocodeResponse;
+    } catch {
+      this.logger.warn(`Photon geocode response was not valid JSON (${endpoint.origin}).`);
+      throw new ServiceUnavailableException('Photon geocoding is unavailable. Please try again.');
+    }
     const features = Array.isArray(payload.features) ? payload.features : [];
     const hits = features
       .map((feature): GeocodeHit | null => {

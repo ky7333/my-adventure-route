@@ -145,6 +145,9 @@ const DEFAULT_FIT_PADDING = {
   bottom: 40,
   left: 40
 };
+const CONTEXT_MENU_OFFSET = 8;
+const CONTEXT_MENU_WIDTH = 160;
+const CONTEXT_MENU_HEIGHT = 96;
 
 export function RouteMap({ options, selectedRouteId, fitPadding, onMapCoordinateSelect }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -247,9 +250,18 @@ export function RouteMap({ options, selectedRouteId, fitPadding, onMapCoordinate
         return;
       }
 
+      const rawX = Math.round(point.x);
+      const rawY = Math.round(point.y);
+      const container = containerRef.current;
+      const maxX = container
+        ? Math.max(0, container.clientWidth - CONTEXT_MENU_WIDTH - CONTEXT_MENU_OFFSET)
+        : rawX;
+      const maxY = container
+        ? Math.max(0, container.clientHeight - CONTEXT_MENU_HEIGHT - CONTEXT_MENU_OFFSET)
+        : rawY;
       setContextMenu({
-        x: Math.round(point.x),
-        y: Math.round(point.y),
+        x: Math.min(Math.max(0, rawX), maxX),
+        y: Math.min(Math.max(0, rawY), maxY),
         lng: lngLat.lng,
         lat: lngLat.lat
       });
@@ -448,14 +460,9 @@ export function RouteMap({ options, selectedRouteId, fitPadding, onMapCoordinate
     <div className="route-map-shell">
       <div className="route-map" ref={containerRef} />
       {contextMenu && onMapCoordinateSelect ? (
-        <div
-          className="map-context-menu"
-          style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
-          role="menu"
-        >
+        <div className="map-context-menu" style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}>
           <button
             type="button"
-            role="menuitem"
             onClick={() => {
               onMapCoordinateSelect({
                 target: 'start',
@@ -469,7 +476,6 @@ export function RouteMap({ options, selectedRouteId, fitPadding, onMapCoordinate
           </button>
           <button
             type="button"
-            role="menuitem"
             onClick={() => {
               onMapCoordinateSelect({
                 target: 'end',

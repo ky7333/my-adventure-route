@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { searchAddressOptions, type GeocodeOption } from '../lib/geocoding';
 
 interface AddressAutocompleteFieldProps {
@@ -28,6 +28,7 @@ export function AddressAutocompleteField({
   const [isOpen, setIsOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const committedSelectionLabelRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (disabled) {
@@ -45,6 +46,15 @@ export function AddressAutocompleteField({
       setIsLoading(false);
       setActiveIndex(-1);
       return;
+    }
+    const normalizedQuery = query.toLowerCase();
+    if (committedSelectionLabelRef.current) {
+      if (committedSelectionLabelRef.current === normalizedQuery) {
+        committedSelectionLabelRef.current = null;
+        setIsLoading(false);
+        return;
+      }
+      committedSelectionLabelRef.current = null;
     }
 
     let isMounted = true;
@@ -81,6 +91,7 @@ export function AddressAutocompleteField({
   }, [disabled, isFocused, value]);
 
   const applyOption = (option: GeocodeOption): void => {
+    committedSelectionLabelRef.current = option.label.trim().toLowerCase();
     onChange(option.label);
     onSelect(option);
     setOptions([]);
@@ -152,6 +163,9 @@ export function AddressAutocompleteField({
           aria-expanded={isOpen}
           aria-controls={listboxId}
           aria-autocomplete="list"
+          aria-activedescendant={
+            isOpen && activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
+          }
         />
         {showHints && (
           <span className="address-autocomplete-status">
@@ -161,17 +175,18 @@ export function AddressAutocompleteField({
         {isOpen && options.length > 0 && (
           <ul id={listboxId} role="listbox" className="address-autocomplete-options">
             {options.map((option, index) => (
-              <li key={`${option.label}-${option.lat}-${option.lng}`}>
-                <button
-                  type="button"
-                  className={`address-autocomplete-option${index === activeIndex ? ' active' : ''}`}
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                    applyOption(option);
-                  }}
-                >
-                  {option.label}
-                </button>
+              <li
+                key={`${option.label}-${option.lat}-${option.lng}`}
+                id={`${listboxId}-option-${index}`}
+                role="option"
+                aria-selected={index === activeIndex}
+                className={`address-autocomplete-option${index === activeIndex ? ' active' : ''}`}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  applyOption(option);
+                }}
+              >
+                {option.label}
               </li>
             ))}
           </ul>

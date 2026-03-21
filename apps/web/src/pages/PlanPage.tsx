@@ -142,6 +142,33 @@ function coordinateLabel(lat: number, lng: number): string {
   return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
+function computeAutoPlanSignature(input: {
+  startLabel: string;
+  endLabel: string;
+  loopRide: boolean;
+  vehicleType: VehicleType;
+  preferences: RoutePreferences;
+  selectedStartOption: GeocodeOption | null;
+  selectedEndOption: GeocodeOption | null;
+}): string {
+  const startAddress = input.startLabel.trim();
+  const destinationAddress = input.endLabel.trim();
+  const startCoordinate = coordinateKey(input.selectedStartOption, startAddress);
+  const endCoordinate = input.loopRide
+    ? ''
+    : coordinateKey(input.selectedEndOption, destinationAddress);
+
+  return JSON.stringify({
+    startAddress: startAddress.toLowerCase(),
+    destinationAddress: input.loopRide ? '' : destinationAddress.toLowerCase(),
+    loopRide: input.loopRide,
+    vehicleType: input.vehicleType,
+    preferences: input.preferences,
+    startCoordinateKey: startCoordinate,
+    endCoordinateKey: endCoordinate
+  });
+}
+
 export function PlanPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const routeRequestId = searchParams.get('routeRequestId');
@@ -218,28 +245,38 @@ export function PlanPage() {
         setSelectedRouteId(response.options[0]?.id ?? null);
 
         if (!isAutoPlannedRoute) {
-          setStartLabel(response.start.label);
-          setSelectedStartOption({
+          const startOption: GeocodeOption = {
             label: response.start.label,
             lat: response.start.lat,
             lng: response.start.lng
+          };
+          const endOption: GeocodeOption | null = response.end
+            ? {
+                label: response.end.label,
+                lat: response.end.lat,
+                lng: response.end.lng
+              }
+            : null;
+          const end = response.end ?? response.start;
+
+          lastAutoPlanSignatureRef.current = computeAutoPlanSignature({
+            startLabel: response.start.label,
+            endLabel: end.label,
+            loopRide: response.loopRide,
+            vehicleType: response.vehicleType,
+            preferences: response.preferences,
+            selectedStartOption: startOption,
+            selectedEndOption: endOption
           });
+          setStartLabel(response.start.label);
+          setSelectedStartOption(startOption);
           setLoopRide(response.loopRide);
           setVehicleType(response.vehicleType);
           setPreferences(response.preferences);
           setRoutePreferenceProfile(resolveRoutePreferenceProfile(response.preferences));
 
-          const end = response.end ?? response.start;
           setEndLabel(end.label);
-          setSelectedEndOption(
-            response.end
-              ? {
-                  label: response.end.label,
-                  lat: response.end.lat,
-                  lng: response.end.lng
-                }
-              : null
-          );
+          setSelectedEndOption(endOption);
         }
       })
       .catch((requestError) => {
@@ -347,16 +384,14 @@ export function PlanPage() {
       return;
     }
 
-    const startCoordinateKey = coordinateKey(selectedStartOption, startAddress);
-    const endCoordinateKey = loopRide ? '' : coordinateKey(selectedEndOption, destinationAddress);
-    const autoPlanSignature = JSON.stringify({
-      startAddress: startAddress.toLowerCase(),
-      destinationAddress: loopRide ? '' : destinationAddress.toLowerCase(),
+    const autoPlanSignature = computeAutoPlanSignature({
+      startLabel: startAddress,
+      endLabel: destinationAddress,
       loopRide,
       vehicleType,
       preferences,
-      startCoordinateKey,
-      endCoordinateKey
+      selectedStartOption,
+      selectedEndOption
     });
 
     if (lastAutoPlanSignatureRef.current === autoPlanSignature) {
@@ -413,7 +448,7 @@ export function PlanPage() {
           lastAutoPlannedRouteRequestIdRef.current = response.routeRequestId;
           const nextParams = new URLSearchParams(window.location.search);
           nextParams.set('routeRequestId', response.routeRequestId);
-          setSearchParams(nextParams);
+          setSearchParams(nextParams, { replace: true });
         } catch (submissionError) {
           if (!isMounted || autoPlanSequenceRef.current !== sequence) {
             return;
