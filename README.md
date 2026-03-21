@@ -131,6 +131,47 @@ Run web only:
 pnpm --filter @adventure/web test
 ```
 
+## CI/CD and Releases
+This repository now includes a full GitHub Actions setup:
+
+- `CI` (`.github/workflows/ci.yml`)
+  - Runs on pull requests and pushes to `main`
+  - Installs dependencies with PNPM cache
+  - Generates Prisma client
+  - Runs lint, tests, and build on Node 20
+  - Runs compatibility smoke tests on Node 22
+
+- `Containers` (`.github/workflows/containers.yml`)
+  - On pull requests: validates Docker builds for `apps/api` and `apps/web`
+  - On `main` and version tags (`v*`): builds and pushes multi-arch images to GHCR (`linux/amd64`, `linux/arm64`)
+  - Publishes:
+    - `ghcr.io/<owner>/<repo>-api`
+    - `ghcr.io/<owner>/<repo>-web`
+  - Adds SBOM/provenance attestation during image publish
+
+- `Release Please` (`.github/workflows/release-please.yml`)
+  - On push to `main`, opens/updates a release PR using Conventional Commits
+  - When the release PR is merged, creates:
+    - a Git tag (`vX.Y.Z`)
+    - a GitHub Release
+    - a `CHANGELOG.md` update
+
+- `Dependency Review` (`.github/workflows/dependency-review.yml`)
+  - Blocks PRs introducing high-severity vulnerable dependencies
+
+- `CodeQL` (`.github/workflows/codeql.yml`)
+  - Security and quality static analysis on PRs, `main`, and weekly schedule
+
+- `Workflow Lint` (`.github/workflows/workflow-lint.yml`)
+  - Lints workflow files with `actionlint`
+
+- `Dependabot` (`.github/dependabot.yml`)
+  - Weekly npm and GitHub Actions dependency update PRs
+
+### Release notes
+- Release automation is based on Conventional Commit messages (`feat:`, `fix:`, etc.).
+- Container publish on version tags is automatic; `vX.Y.Z` tags produced by Release Please will trigger image publishing.
+
 ## Troubleshooting
 - If GraphHopper fails on startup, ensure `infra/data/osm/vermont-latest.osm.pbf` exists.
 - If you see `Couldn't load from existing folder: /data/default-gh ... DataReader wasn't specified`, your container started without `--input`; use the repo compose config (it now passes `--input` and `--graph-cache` explicitly for `israelhikingmap/graphhopper`).
