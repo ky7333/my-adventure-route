@@ -1,9 +1,21 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+  geocodeSearchResponseSchema,
   locationInputSchema,
   planRouteResponseSchema,
   routeDetailResponseSchema,
   routeSurfaceSectionsSchema,
+  type GeocodeHit,
+  type GeocodeSearchResponse,
   type PlanRouteRequest,
   type PlanRouteResponse,
   type RouteAlternative,
@@ -19,6 +31,94 @@ import { ScoringService } from '../scoring/scoring.service';
 import type { RawRouteCandidate } from '../routing/types';
 
 const SURFACE_KEYS = ['paved', 'gravel', 'dirt', 'unknown'] as const;
+
+interface PhotonFeatureProperties {
+  name?: string;
+  street?: string;
+  housenumber?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postcode?: string;
+}
+
+interface PhotonFeature {
+  geometry?: {
+    coordinates?: unknown;
+  };
+  properties?: PhotonFeatureProperties;
+}
+
+interface PhotonGeocodeResponse {
+  features?: PhotonFeature[];
+}
+
+function photonText(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function parseNumericCoordinate(value: unknown, min?: number, max?: number): number | null {
+  const withinBounds = (numeric: number): boolean => {
+    if (min !== undefined && numeric < min) {
+      return false;
+    }
+    if (max !== undefined && numeric > max) {
+      return false;
+    }
+    return true;
+  };
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return withinBounds(value) ? value : null;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    if (!normalized) {
+      return null;
+    }
+    const parsed = Number(normalized);
+    if (Number.isFinite(parsed)) {
+      return withinBounds(parsed) ? parsed : null;
+    }
+  }
+
+  return null;
+}
+
+function joinLabelParts(parts: string[], fallback: string): string {
+  const unique = new Set<string>();
+  const cleanedParts = parts
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .filter((part) => {
+      const normalized = part.toLowerCase();
+      if (unique.has(normalized)) {
+        return false;
+      }
+      unique.add(normalized);
+      return true;
+    });
+
+  return cleanedParts.length > 0 ? cleanedParts.join(', ') : fallback;
+}
+
+function buildPhotonLabel(properties: PhotonFeatureProperties | undefined, fallback: string): string {
+  const streetLine = [photonText(properties?.street), photonText(properties?.housenumber)]
+    .join(' ')
+    .trim();
+  return joinLabelParts(
+    [
+      photonText(properties?.name),
+      streetLine,
+      photonText(properties?.city),
+      photonText(properties?.state),
+      photonText(properties?.country),
+      photonText(properties?.postcode)
+    ],
+    fallback
+  );
+}
 
 function roundSurfacePercents(rawPercents: Record<RouteSurfaceType, number>): SurfaceMix {
   const entries = SURFACE_KEYS.map((surface) => ({
@@ -303,11 +403,24 @@ function readSurfaceSectionsFromProviderMeta(providerMeta: Prisma.JsonValue): Ro
 
 @Injectable()
 export class RoutesService {
+  private readonly logger = new Logger(RoutesService.name);
+
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(RoutingService) private readonly routingService: RoutingService,
-    @Inject(ScoringService) private readonly scoringService: ScoringService
+    @Inject(ScoringService) private readonly scoringService: ScoringService,
+    @Inject(ConfigService) private readonly configService: ConfigService
   ) {}
+
+  async geocodeAddress(query: string, limit = 5): Promise<GeocodeSearchResponse> {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) {
+      throw new BadRequestException('q is required');
+    }
+
+    const hits = await this.searchPhoton(trimmedQuery, limit);
+    return geocodeSearchResponseSchema.parse({ hits });
+  }
 
   async planRoute(userId: string, input: PlanRouteRequest): Promise<PlanRouteResponse> {
     const candidates = await this.routingService.planCandidates(input);
@@ -449,5 +562,92 @@ export class RoutesService {
         surfaceSections: readSurfaceSectionsFromProviderMeta(option.providerMeta)
       }))
     });
+  }
+
+  private async searchPhoton(query: string, limit: number): Promise<GeocodeHit[]> {
+    const configuredPhotonBaseUrl = this.configService.get<string>('PHOTON_BASE_URL')?.trim();
+    const photonBaseUrl = configuredPhotonBaseUrl || 'https://photon.komoot.io';
+    let endpoint: URL;
+    try {
+      endpoint = new URL('/api', photonBaseUrl.endsWith('/') ? photonBaseUrl : `${photonBaseUrl}/`);
+    } catch {
+      this.logger.warn(`Invalid PHOTON_BASE_URL configuration (${photonBaseUrl}).`);
+      throw new ServiceUnavailableException('Photon geocoding is unavailable. Please try again.');
+    }
+    endpoint.searchParams.set('q', query);
+    endpoint.searchParams.set('limit', String(limit));
+    endpoint.searchParams.set('lang', 'en');
+
+    let response: Response;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      response = await fetch(endpoint, {
+        headers: {
+          Accept: 'application/json'
+        },
+        signal: controller.signal
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Photon geocode request failed (${endpoint.origin}): ${(error as Error).message}`
+      );
+      throw new ServiceUnavailableException('Photon geocoding is unavailable. Please try again.');
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      this.logger.warn(
+        `Photon geocode request returned ${response.status} (${endpoint.origin}).`
+      );
+      throw new ServiceUnavailableException('Photon geocoding is unavailable. Please try again.');
+    }
+
+    let payload: PhotonGeocodeResponse;
+    try {
+      payload = (await response.json()) as PhotonGeocodeResponse;
+    } catch {
+      this.logger.warn(`Photon geocode response was not valid JSON (${endpoint.origin}).`);
+      throw new ServiceUnavailableException('Photon geocoding is unavailable. Please try again.');
+    }
+    if (!Array.isArray(payload.features)) {
+      this.logger.warn(`Photon geocode response was missing a features array (${endpoint.origin}).`);
+      throw new ServiceUnavailableException('Photon geocoding is unavailable. Please try again.');
+    }
+    const features = payload.features;
+    const hits = features
+      .map((feature): GeocodeHit | null => {
+        if (!feature || typeof feature !== 'object') {
+          return null;
+        }
+        const rawCoordinates = feature.geometry?.coordinates;
+        if (!Array.isArray(rawCoordinates) || rawCoordinates.length < 2) {
+          return null;
+        }
+
+        const lng = parseNumericCoordinate(rawCoordinates[0], -180, 180);
+        const lat = parseNumericCoordinate(rawCoordinates[1], -90, 90);
+        if (lat === null || lng === null) {
+          return null;
+        }
+
+        return {
+          label: buildPhotonLabel(feature.properties, query),
+          lat,
+          lng
+        };
+      })
+      .filter((hit): hit is GeocodeHit => hit !== null);
+
+    const uniqueHits = new Map<string, GeocodeHit>();
+    for (const hit of hits) {
+      const key = `${hit.label.toLowerCase()}|${hit.lat.toFixed(6)}|${hit.lng.toFixed(6)}`;
+      if (!uniqueHits.has(key)) {
+        uniqueHits.set(key, hit);
+      }
+    }
+
+    return Array.from(uniqueHits.values()).slice(0, limit);
   }
 }

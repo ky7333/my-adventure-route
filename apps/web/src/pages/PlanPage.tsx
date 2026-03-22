@@ -5,14 +5,15 @@ import type {
   RoutePreferences,
   VehicleType
 } from '@adventure/contracts';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { AddressAutocompleteField } from '../components/AddressAutocompleteField';
 import { RouteMap } from '../components/RouteMap';
 import { RouteOptionsPanel } from '../components/RouteOptionsPanel';
 import { fetchRoute, planRoute } from '../lib/api';
 import { formatRouteDistance } from '../lib/formatDistance';
 import { formatRouteDuration } from '../lib/formatDuration';
-import { geocodeAddress } from '../lib/geocoding';
+import { geocodeAddress, type GeocodeOption } from '../lib/geocoding';
 
 const defaultPreferences: RoutePreferences = {
   curvy: 70,
@@ -91,6 +92,7 @@ interface FitPadding {
 }
 
 const BASE_PADDING = 40;
+const AUTO_PLAN_DEBOUNCE_MS = 550;
 
 function preferencesMatch(left: RoutePreferences, right: RoutePreferences): boolean {
   return (
@@ -125,11 +127,55 @@ function toErrorMessage(error: unknown): string {
   return 'Unexpected error while planning route';
 }
 
+function matchesSelectedOptionLabel(option: GeocodeOption | null, label: string): option is GeocodeOption {
+  return option !== null && option.label.trim().toLowerCase() === label.trim().toLowerCase();
+}
+
+function coordinateKey(option: GeocodeOption | null, label: string): string {
+  if (!matchesSelectedOptionLabel(option, label)) {
+    return '';
+  }
+  return `${option.lat.toFixed(6)},${option.lng.toFixed(6)}`;
+}
+
+function coordinateLabel(lat: number, lng: number): string {
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
+function computeAutoPlanSignature(input: {
+  startLabel: string;
+  endLabel: string;
+  loopRide: boolean;
+  vehicleType: VehicleType;
+  preferences: RoutePreferences;
+  selectedStartOption: GeocodeOption | null;
+  selectedEndOption: GeocodeOption | null;
+}): string {
+  const startAddress = input.startLabel.trim();
+  const destinationAddress = input.endLabel.trim();
+  const startCoordinate = coordinateKey(input.selectedStartOption, startAddress);
+  const endCoordinate = input.loopRide
+    ? ''
+    : coordinateKey(input.selectedEndOption, destinationAddress);
+
+  return JSON.stringify({
+    startAddress: startAddress.toLowerCase(),
+    destinationAddress: input.loopRide ? '' : destinationAddress.toLowerCase(),
+    loopRide: input.loopRide,
+    vehicleType: input.vehicleType,
+    preferences: input.preferences,
+    startCoordinateKey: startCoordinate,
+    endCoordinateKey: endCoordinate
+  });
+}
+
 export function PlanPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const routeRequestId = searchParams.get('routeRequestId');
   const [startLabel, setStartLabel] = useState('Burlington, VT');
+  const [selectedStartOption, setSelectedStartOption] = useState<GeocodeOption | null>(null);
   const [endLabel, setEndLabel] = useState('Stowe, VT');
+  const [selectedEndOption, setSelectedEndOption] = useState<GeocodeOption | null>(null);
   const [loopRide, setLoopRide] = useState(false);
   const [vehicleType, setVehicleType] = useState<VehicleType>('adv_motorcycle');
   const [preferences, setPreferences] = useState<RoutePreferences>(defaultPreferences);
@@ -149,6 +195,9 @@ export function PlanPage() {
   });
   const layoutRef = useRef<HTMLElement | null>(null);
   const floatingPanelRef = useRef<HTMLElement | null>(null);
+  const autoPlanSequenceRef = useRef(0);
+  const lastAutoPlannedRouteRequestIdRef = useRef<string | null>(null);
+  const lastAutoPlanSignatureRef = useRef<string | null>(null);
 
   const setSlider = (key: keyof RoutePreferences, value: number): void => {
     setRoutePreferenceProfile(CUSTOM_ROUTE_PROFILE_ID);
@@ -191,16 +240,45 @@ export function PlanPage() {
           return;
         }
 
+        const isAutoPlannedRoute = response.routeRequestId === lastAutoPlannedRouteRequestIdRef.current;
         setRouteDetail(response);
         setSelectedRouteId(response.options[0]?.id ?? null);
-        setStartLabel(response.start.label);
-        setLoopRide(response.loopRide);
-        setVehicleType(response.vehicleType);
-        setPreferences(response.preferences);
-        setRoutePreferenceProfile(resolveRoutePreferenceProfile(response.preferences));
 
+        const startOption: GeocodeOption = {
+          label: response.start.label,
+          lat: response.start.lat,
+          lng: response.start.lng
+        };
+        const endOption: GeocodeOption | null = response.end
+          ? {
+              label: response.end.label,
+              lat: response.end.lat,
+              lng: response.end.lng
+            }
+          : null;
         const end = response.end ?? response.start;
-        setEndLabel(end.label);
+
+        lastAutoPlanSignatureRef.current = computeAutoPlanSignature({
+          startLabel: response.start.label,
+          endLabel: end.label,
+          loopRide: response.loopRide,
+          vehicleType: response.vehicleType,
+          preferences: response.preferences,
+          selectedStartOption: startOption,
+          selectedEndOption: endOption
+        });
+        setSelectedStartOption(startOption);
+        setSelectedEndOption(endOption);
+
+        if (!isAutoPlannedRoute) {
+          setStartLabel(response.start.label);
+          setLoopRide(response.loopRide);
+          setVehicleType(response.vehicleType);
+          setPreferences(response.preferences);
+          setRoutePreferenceProfile(resolveRoutePreferenceProfile(response.preferences));
+
+          setEndLabel(end.label);
+        }
       })
       .catch((requestError) => {
         if (!isMounted) {
@@ -293,55 +371,150 @@ export function PlanPage() {
     };
   }, []);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
+  useEffect(() => {
+    if (isLoadingRoute) {
+      return;
+    }
 
-    try {
-      const startAddress = startLabel.trim();
-      if (!startAddress) {
-        throw new Error('Start address is required');
-      }
+    const resetPlannerForInvalidInput = (): void => {
+      setIsSubmitting(false);
+      setError(null);
+      setRouteDetail(null);
+      setSelectedRouteId(null);
+      lastAutoPlanSignatureRef.current = null;
+      lastAutoPlannedRouteRequestIdRef.current = null;
+    };
 
-      const startCoordinates = await geocodeAddress(startAddress, 'start address');
-      const payload: PlanRouteRequest = {
-        start: {
-          label: startAddress,
-          lat: startCoordinates.lat,
-          lng: startCoordinates.lng
-        },
-        loopRide,
-        vehicleType,
-        preferences
+    const startAddress = startLabel.trim();
+    const destinationAddress = endLabel.trim();
+    if (startAddress.length < 3) {
+      resetPlannerForInvalidInput();
+      return;
+    }
+    if (!loopRide && destinationAddress.length < 3) {
+      resetPlannerForInvalidInput();
+      return;
+    }
+
+    const autoPlanSignature = computeAutoPlanSignature({
+      startLabel: startAddress,
+      endLabel: destinationAddress,
+      loopRide,
+      vehicleType,
+      preferences,
+      selectedStartOption,
+      selectedEndOption
+    });
+
+    if (lastAutoPlanSignatureRef.current === autoPlanSignature) {
+      return;
+    }
+
+    let isMounted = true;
+    const timer = setTimeout(() => {
+      const runAutoPlan = async (): Promise<void> => {
+        const sequence = autoPlanSequenceRef.current + 1;
+        autoPlanSequenceRef.current = sequence;
+        setIsSubmitting(true);
+        setError(null);
+
+        try {
+          const startCoordinates = matchesSelectedOptionLabel(selectedStartOption, startAddress)
+            ? selectedStartOption
+            : await geocodeAddress(startAddress, 'start address');
+          if (!isMounted || autoPlanSequenceRef.current !== sequence) {
+            return;
+          }
+
+          const payload: PlanRouteRequest = {
+            start: {
+              label: startAddress,
+              lat: startCoordinates.lat,
+              lng: startCoordinates.lng
+            },
+            loopRide,
+            vehicleType,
+            preferences
+          };
+
+          if (!loopRide) {
+            const endCoordinates = matchesSelectedOptionLabel(selectedEndOption, destinationAddress)
+              ? selectedEndOption
+              : await geocodeAddress(destinationAddress, 'end address');
+            if (!isMounted || autoPlanSequenceRef.current !== sequence) {
+              return;
+            }
+            payload.end = {
+              label: destinationAddress,
+              lat: endCoordinates.lat,
+              lng: endCoordinates.lng
+            };
+          }
+
+          const response = await planRoute(payload);
+          if (!isMounted || autoPlanSequenceRef.current !== sequence) {
+            return;
+          }
+
+          lastAutoPlanSignatureRef.current = autoPlanSignature;
+          lastAutoPlannedRouteRequestIdRef.current = response.routeRequestId;
+          const nextParams = new URLSearchParams(window.location.search);
+          nextParams.set('routeRequestId', response.routeRequestId);
+          setSearchParams(nextParams, { replace: true });
+        } catch (submissionError) {
+          if (!isMounted || autoPlanSequenceRef.current !== sequence) {
+            return;
+          }
+          setError(toErrorMessage(submissionError));
+        } finally {
+          if (isMounted && autoPlanSequenceRef.current === sequence) {
+            setIsSubmitting(false);
+          }
+        }
       };
 
-      if (!loopRide) {
-        const destinationAddress = endLabel.trim();
-        if (!destinationAddress) {
-          throw new Error('End address is required');
-        }
+      void runAutoPlan();
+    }, AUTO_PLAN_DEBOUNCE_MS);
 
-        const endCoordinates = await geocodeAddress(destinationAddress, 'end address');
-        payload.end = {
-          label: destinationAddress,
-          lat: endCoordinates.lat,
-          lng: endCoordinates.lng
-        };
-      }
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [
+    isLoadingRoute,
+    loopRide,
+    selectedEndOption,
+    selectedStartOption,
+    setSearchParams,
+    startLabel,
+    endLabel,
+    vehicleType,
+    preferences
+  ]);
 
-      const response = await planRoute(payload);
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.set('routeRequestId', response.routeRequestId);
-      setSearchParams(nextParams);
-    } catch (submissionError) {
-      setError(toErrorMessage(submissionError));
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handlePlannerSubmit = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
   };
 
-  const destinationLabel = loopRide ? `${startLabel} (loop)` : endLabel;
+  const handleMapCoordinateSelect = (selection: { target: 'start' | 'end'; lat: number; lng: number }): void => {
+    const label = coordinateLabel(selection.lat, selection.lng);
+    const option: GeocodeOption = {
+      label,
+      lat: selection.lat,
+      lng: selection.lng
+    };
+
+    setError(null);
+    if (selection.target === 'start') {
+      setStartLabel(label);
+      setSelectedStartOption(option);
+      return;
+    }
+
+    setLoopRide(false);
+    setEndLabel(label);
+    setSelectedEndOption(option);
+  };
 
   return (
     <section className="map-results-layout" ref={layoutRef}>
@@ -349,129 +522,119 @@ export function PlanPage() {
         options={routeDetail?.options ?? []}
         selectedRouteId={selectedRouteId}
         fitPadding={fitPadding}
+        onMapCoordinateSelect={handleMapCoordinateSelect}
       />
       <aside className="floating-route-panel" aria-label="Route controls" ref={floatingPanelRef}>
         <section className="planner-float-card">
-          <h1>Plan your adventure route</h1>
-          <p className="muted planner-hint">
-            Enter start and destination addresses. We will geocode them automatically.
-          </p>
-          <form onSubmit={handleSubmit} className="planner-grid planner-grid--floating">
-            <label>
-              Start address
-              <input value={startLabel} onChange={(event) => setStartLabel(event.target.value)} required />
-            </label>
+          <form onSubmit={handlePlannerSubmit} className="planner-grid planner-grid--floating">
+            <AddressAutocompleteField
+              label="Start address"
+              value={startLabel}
+              required
+              onChange={(value) => {
+                setStartLabel(value);
+                setSelectedStartOption(null);
+              }}
+              onSelect={setSelectedStartOption}
+            />
 
             <label className="checkbox-row">
-              <input type="checkbox" checked={loopRide} onChange={(event) => setLoopRide(event.target.checked)} />
+              <input
+                type="checkbox"
+                checked={loopRide}
+                onChange={(event) => {
+                  const checked = event.target.checked;
+                  setLoopRide(checked);
+                  if (checked) {
+                    setSelectedEndOption(null);
+                  }
+                }}
+              />
               Loop ride (return to start)
             </label>
 
-            <label>
-              End address
-              <input
-                value={endLabel}
-                onChange={(event) => setEndLabel(event.target.value)}
-                required={!loopRide}
-                disabled={loopRide}
-              />
-            </label>
+            <AddressAutocompleteField
+              label="End address"
+              value={endLabel}
+              required={!loopRide}
+              disabled={loopRide}
+              onChange={(value) => {
+                setEndLabel(value);
+                setSelectedEndOption(null);
+              }}
+              onSelect={setSelectedEndOption}
+            />
 
-            <label>
-              Route profile
-              <select
-                value={routePreferenceProfile}
-                onChange={(event) => handleRoutePreferenceProfileChange(event.target.value)}
-              >
-                {ROUTE_PREFERENCE_PROFILES.map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.label}
-                  </option>
-                ))}
-                <option value={CUSTOM_ROUTE_PROFILE_ID}>Custom</option>
-              </select>
-            </label>
-
-            <label>
-              Vehicle
-              <select value={vehicleType} onChange={(event) => setVehicleType(event.target.value as VehicleType)}>
-                <option value="motorcycle">Motorcycle</option>
-                <option value="adv_motorcycle">ADV Motorcycle</option>
-                <option value="4x4">4x4</option>
-              </select>
-            </label>
-
-            {routePreferenceProfile === CUSTOM_ROUTE_PROFILE_ID ? (
-              <div className="preferences-compact-grid">
-                <Slider
-                  label="Curvy"
-                  value={preferences.curvy}
-                  onChange={(value) => setSlider('curvy', value)}
-                />
-                <Slider
-                  label="Scenic"
-                  value={preferences.scenic}
-                  onChange={(value) => setSlider('scenic', value)}
-                />
-                <Slider
-                  label="Avoid highways"
-                  value={preferences.avoidHighways}
-                  onChange={(value) => setSlider('avoidHighways', value)}
-                />
-                <Slider
-                  label="Unpaved preference"
-                  value={preferences.unpavedPreference}
-                  onChange={(value) => setSlider('unpavedPreference', value)}
-                />
-                <Slider
-                  label="Difficulty"
-                  value={preferences.difficulty}
-                  onChange={(value) => setSlider('difficulty', value)}
-                />
-                <Slider
-                  label="Distance influence"
-                  value={preferences.distanceInfluence}
-                  min={15}
-                  max={100}
-                  onChange={(value) => setSlider('distanceInfluence', value)}
-                />
-              </div>
-            ) : (
-              <p className="muted profile-preset-hint">
-                Using preset tuning. Select Custom to show manual preference sliders.
-              </p>
-            )}
-
-            {error && <p className="form-error">{error}</p>}
-
-            <button className="btn-primary planner-submit" disabled={isSubmitting} type="submit">
-              {isSubmitting ? 'Geocoding & Generating...' : 'Generate Routes'}
-            </button>
-          </form>
-
-          {(isLoadingRoute || routeDetail) && (
             <section className="planner-results-section" aria-live="polite">
               <h2>Route Results</h2>
               {isLoadingRoute ? (
                 <p className="muted">Loading route options...</p>
               ) : (
                 <>
-                  <div className="from-to-lines">
-                    <div className="from-to-line">
-                      <span className="from-to-pin from-to-pin-start" aria-hidden="true" />
-                      <div className="from-to-copy">
-                        <span className="from-to-label">From</span>
-                        <span className="from-to-value">{startLabel}</span>
-                      </div>
+                  <label>
+                    Route profile
+                    <select
+                      value={routePreferenceProfile}
+                      onChange={(event) => handleRoutePreferenceProfileChange(event.target.value)}
+                    >
+                      {ROUTE_PREFERENCE_PROFILES.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.label}
+                        </option>
+                      ))}
+                      <option value={CUSTOM_ROUTE_PROFILE_ID}>Custom</option>
+                    </select>
+                  </label>
+                  <label>
+                    Vehicle
+                    <select value={vehicleType} onChange={(event) => setVehicleType(event.target.value as VehicleType)}>
+                      <option value="motorcycle">Motorcycle</option>
+                      <option value="adv_motorcycle">ADV Motorcycle</option>
+                      <option value="4x4">4x4</option>
+                    </select>
+                  </label>
+                  {routePreferenceProfile === CUSTOM_ROUTE_PROFILE_ID ? (
+                    <div className="preferences-compact-grid">
+                      <Slider
+                        label="Curvy"
+                        value={preferences.curvy}
+                        onChange={(value) => setSlider('curvy', value)}
+                      />
+                      <Slider
+                        label="Scenic"
+                        value={preferences.scenic}
+                        onChange={(value) => setSlider('scenic', value)}
+                      />
+                      <Slider
+                        label="Avoid highways"
+                        value={preferences.avoidHighways}
+                        onChange={(value) => setSlider('avoidHighways', value)}
+                      />
+                      <Slider
+                        label="Unpaved preference"
+                        value={preferences.unpavedPreference}
+                        onChange={(value) => setSlider('unpavedPreference', value)}
+                      />
+                      <Slider
+                        label="Difficulty"
+                        value={preferences.difficulty}
+                        onChange={(value) => setSlider('difficulty', value)}
+                      />
+                      <Slider
+                        label="Distance influence"
+                        value={preferences.distanceInfluence}
+                        min={15}
+                        max={100}
+                        onChange={(value) => setSlider('distanceInfluence', value)}
+                      />
                     </div>
-                    <div className="from-to-line">
-                      <span className="from-to-pin from-to-pin-end" aria-hidden="true" />
-                      <div className="from-to-copy">
-                        <span className="from-to-label">To</span>
-                        <span className="from-to-value">{destinationLabel}</span>
-                      </div>
-                    </div>
-                  </div>
+                  ) : (
+                    <p className="muted profile-preset-hint">
+                      Using preset tuning. Select Custom to show manual preference sliders.
+                    </p>
+                  )}
+                  {error && <p className="form-error">{error}</p>}
+                  {isSubmitting ? <p className="muted">Auto-generating routes...</p> : null}
                   {selectedRoute && (
                     <p className="from-to-stats">
                       Selected: {formatRouteDistance(selectedRoute.distanceKm)} • {formatRouteDuration(selectedRoute.durationMin)}
@@ -487,7 +650,7 @@ export function PlanPage() {
                 </>
               )}
             </section>
-          )}
+          </form>
         </section>
       </aside>
     </section>

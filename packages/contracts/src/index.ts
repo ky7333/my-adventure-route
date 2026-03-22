@@ -122,6 +122,24 @@ export const planRouteResponseSchema = z.object({
 });
 export type PlanRouteResponse = z.infer<typeof planRouteResponseSchema>;
 
+export const geocodeSearchQuerySchema = z.object({
+  q: z.string().trim().min(1).max(200),
+  limit: z.coerce.number().int().min(1).max(10).default(5)
+});
+export type GeocodeSearchQuery = z.infer<typeof geocodeSearchQuerySchema>;
+
+export const geocodeHitSchema = z.object({
+  label: z.string().min(1),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180)
+});
+export type GeocodeHit = z.infer<typeof geocodeHitSchema>;
+
+export const geocodeSearchResponseSchema = z.object({
+  hits: z.array(geocodeHitSchema).max(10)
+});
+export type GeocodeSearchResponse = z.infer<typeof geocodeSearchResponseSchema>;
+
 export const authRegisterSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8)

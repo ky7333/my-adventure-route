@@ -12,6 +12,11 @@ interface RouteMapProps {
     bottom: number;
     left: number;
   };
+  onMapCoordinateSelect?: (selection: {
+    target: 'start' | 'end';
+    lat: number;
+    lng: number;
+  }) => void;
 }
 
 const SURFACE_COLORS: Record<RouteSurfaceType, string> = {
@@ -140,14 +145,23 @@ const DEFAULT_FIT_PADDING = {
   bottom: 40,
   left: 40
 };
+const CONTEXT_MENU_OFFSET = 8;
+const CONTEXT_MENU_WIDTH = 160;
+const CONTEXT_MENU_HEIGHT = 96;
 
-export function RouteMap({ options, selectedRouteId, fitPadding }: RouteMapProps) {
+export function RouteMap({ options, selectedRouteId, fitPadding, onMapCoordinateSelect }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const maplibreRef = useRef<MapLibreGlobal | null>(null);
   const lastFittedRouteIdRef = useRef<string | null>(null);
   const lastFitPaddingKeyRef = useRef<string | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    lat: number;
+    lng: number;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -205,6 +219,66 @@ export function RouteMap({ options, selectedRouteId, fitPadding }: RouteMapProps
       setIsMapReady(false);
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapReady || !onMapCoordinateSelect) {
+      return;
+    }
+
+    interface ContextMenuEvent {
+      point?: {
+        x: number;
+        y: number;
+      };
+      lngLat?: {
+        lng: number;
+        lat: number;
+      };
+      originalEvent?: Event;
+    }
+
+    const hideContextMenu = (): void => {
+      setContextMenu(null);
+    };
+
+    const handleContextMenu = (event: ContextMenuEvent): void => {
+      event.originalEvent?.preventDefault();
+      const point = event.point;
+      const lngLat = event.lngLat;
+      if (!point || !lngLat) {
+        return;
+      }
+
+      const rawX = Math.round(point.x);
+      const rawY = Math.round(point.y);
+      const container = containerRef.current;
+      const maxX = container
+        ? Math.max(0, container.clientWidth - CONTEXT_MENU_WIDTH - CONTEXT_MENU_OFFSET)
+        : rawX;
+      const maxY = container
+        ? Math.max(0, container.clientHeight - CONTEXT_MENU_HEIGHT - CONTEXT_MENU_OFFSET)
+        : rawY;
+      setContextMenu({
+        x: Math.min(Math.max(0, rawX), maxX),
+        y: Math.min(Math.max(0, rawY), maxY),
+        lng: lngLat.lng,
+        lat: lngLat.lat
+      });
+    };
+
+    map.on('contextmenu', handleContextMenu);
+    map.on('click', hideContextMenu);
+    map.on('movestart', hideContextMenu);
+    map.on('dragstart', hideContextMenu);
+
+    return () => {
+      map.off('contextmenu', handleContextMenu);
+      map.off('click', hideContextMenu);
+      map.off('movestart', hideContextMenu);
+      map.off('dragstart', hideContextMenu);
+    };
+  }, [isMapReady, onMapCoordinateSelect]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -385,6 +459,36 @@ export function RouteMap({ options, selectedRouteId, fitPadding }: RouteMapProps
   return (
     <div className="route-map-shell">
       <div className="route-map" ref={containerRef} />
+      {contextMenu && onMapCoordinateSelect ? (
+        <div className="map-context-menu" style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}>
+          <button
+            type="button"
+            onClick={() => {
+              onMapCoordinateSelect({
+                target: 'start',
+                lat: contextMenu.lat,
+                lng: contextMenu.lng
+              });
+              setContextMenu(null);
+            }}
+          >
+            Set as Start
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onMapCoordinateSelect({
+                target: 'end',
+                lat: contextMenu.lat,
+                lng: contextMenu.lng
+              });
+              setContextMenu(null);
+            }}
+          >
+            Set as End
+          </button>
+        </div>
+      ) : null}
       <div className="surface-legend">
         <span className="legend-item">
           <i className="legend-swatch legend-paved" />
