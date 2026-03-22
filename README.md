@@ -171,6 +171,7 @@ This repository now includes a full GitHub Actions setup:
 ### Release notes
 - Release automation is based on Conventional Commit messages (`feat:`, `fix:`, etc.).
 - Container publish on version tags is automatic; `vX.Y.Z` tags produced by Release Please will trigger image publishing.
+- If your repo restricts `GITHUB_TOKEN` from creating PRs, set a `RELEASE_PLEASE_TOKEN` secret (PAT with `contents` and `pull requests` write access). The workflow will use it automatically.
 
 ## Troubleshooting
 - If GraphHopper fails on startup, ensure `infra/data/osm/vermont-latest.osm.pbf` exists.
