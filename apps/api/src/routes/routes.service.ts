@@ -53,6 +53,10 @@ interface PhotonGeocodeResponse {
   features?: PhotonFeature[];
 }
 
+function photonText(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
 function parseNumericCoordinate(value: unknown, min?: number, max?: number): number | null {
   const withinBounds = (numeric: number): boolean => {
     if (min !== undefined && numeric < min) {
@@ -100,11 +104,18 @@ function joinLabelParts(parts: string[], fallback: string): string {
 }
 
 function buildPhotonLabel(properties: PhotonFeatureProperties | undefined, fallback: string): string {
-  const streetLine = [properties?.street ?? '', properties?.housenumber ?? '']
+  const streetLine = [photonText(properties?.street), photonText(properties?.housenumber)]
     .join(' ')
     .trim();
   return joinLabelParts(
-    [properties?.name ?? '', streetLine, properties?.city ?? '', properties?.state ?? '', properties?.country ?? '', properties?.postcode ?? ''],
+    [
+      photonText(properties?.name),
+      streetLine,
+      photonText(properties?.city),
+      photonText(properties?.state),
+      photonText(properties?.country),
+      photonText(properties?.postcode)
+    ],
     fallback
   );
 }
@@ -554,10 +565,15 @@ export class RoutesService {
   }
 
   private async searchPhoton(query: string, limit: number): Promise<GeocodeHit[]> {
-    const photonBaseUrl =
-      this.configService.get<string>('PHOTON_BASE_URL', 'https://photon.komoot.io') ??
-      'https://photon.komoot.io';
-    const endpoint = new URL(`${photonBaseUrl.replace(/\/$/, '')}/api`);
+    const configuredPhotonBaseUrl = this.configService.get<string>('PHOTON_BASE_URL')?.trim();
+    const photonBaseUrl = configuredPhotonBaseUrl || 'https://photon.komoot.io';
+    let endpoint: URL;
+    try {
+      endpoint = new URL('/api', photonBaseUrl.endsWith('/') ? photonBaseUrl : `${photonBaseUrl}/`);
+    } catch {
+      this.logger.warn(`Invalid PHOTON_BASE_URL configuration (${photonBaseUrl}).`);
+      throw new ServiceUnavailableException('Photon geocoding is unavailable. Please try again.');
+    }
     endpoint.searchParams.set('q', query);
     endpoint.searchParams.set('limit', String(limit));
     endpoint.searchParams.set('lang', 'en');
@@ -595,9 +611,16 @@ export class RoutesService {
       this.logger.warn(`Photon geocode response was not valid JSON (${endpoint.origin}).`);
       throw new ServiceUnavailableException('Photon geocoding is unavailable. Please try again.');
     }
-    const features = Array.isArray(payload.features) ? payload.features : [];
+    if (!Array.isArray(payload.features)) {
+      this.logger.warn(`Photon geocode response was missing a features array (${endpoint.origin}).`);
+      throw new ServiceUnavailableException('Photon geocoding is unavailable. Please try again.');
+    }
+    const features = payload.features;
     const hits = features
       .map((feature): GeocodeHit | null => {
+        if (!feature || typeof feature !== 'object') {
+          return null;
+        }
         const rawCoordinates = feature.geometry?.coordinates;
         if (!Array.isArray(rawCoordinates) || rawCoordinates.length < 2) {
           return null;

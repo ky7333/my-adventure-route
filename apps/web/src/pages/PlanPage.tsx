@@ -5,7 +5,7 @@ import type {
   RoutePreferences,
   VehicleType
 } from '@adventure/contracts';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AddressAutocompleteField } from '../components/AddressAutocompleteField';
 import { RouteMap } from '../components/RouteMap';
@@ -376,12 +376,23 @@ export function PlanPage() {
       return;
     }
 
+    const resetPlannerForInvalidInput = (): void => {
+      setIsSubmitting(false);
+      setError(null);
+      setRouteDetail(null);
+      setSelectedRouteId(null);
+      lastAutoPlanSignatureRef.current = null;
+      lastAutoPlannedRouteRequestIdRef.current = null;
+    };
+
     const startAddress = startLabel.trim();
     const destinationAddress = endLabel.trim();
     if (startAddress.length < 3) {
+      resetPlannerForInvalidInput();
       return;
     }
     if (!loopRide && destinationAddress.length < 3) {
+      resetPlannerForInvalidInput();
       return;
     }
 
@@ -481,7 +492,7 @@ export function PlanPage() {
     preferences
   ]);
 
-  const handlePlannerSubmit = (event: React.FormEvent<HTMLFormElement>): void => {
+  const handlePlannerSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
   };
 
