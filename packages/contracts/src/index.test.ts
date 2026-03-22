@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  geocodeHitSchema,
   planRouteRequestSchema,
   planRouteResponseSchema,
   routeSurfaceSectionSchema,
@@ -165,6 +166,18 @@ describe('surfaceMixSchema', () => {
       gravelPercent: 40,
       dirtPercent: 0,
       unknownPercent: 0
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe('geocodeHitSchema', () => {
+  it('rejects whitespace-only labels', () => {
+    const parsed = geocodeHitSchema.safeParse({
+      label: '   ',
+      lat: 44.4,
+      lng: -72.7
     });
 
     expect(parsed.success).toBe(false);
