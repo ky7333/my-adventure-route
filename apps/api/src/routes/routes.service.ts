@@ -53,15 +53,29 @@ interface PhotonGeocodeResponse {
   features?: PhotonFeature[];
 }
 
-function parseNumericCoordinate(value: unknown): number | null {
+function parseNumericCoordinate(value: unknown, min?: number, max?: number): number | null {
+  const withinBounds = (numeric: number): boolean => {
+    if (min !== undefined && numeric < min) {
+      return false;
+    }
+    if (max !== undefined && numeric > max) {
+      return false;
+    }
+    return true;
+  };
+
   if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
+    return withinBounds(value) ? value : null;
   }
 
   if (typeof value === 'string') {
-    const parsed = Number(value);
+    const normalized = value.trim();
+    if (!normalized) {
+      return null;
+    }
+    const parsed = Number(normalized);
     if (Number.isFinite(parsed)) {
-      return parsed;
+      return withinBounds(parsed) ? parsed : null;
     }
   }
 
@@ -589,8 +603,8 @@ export class RoutesService {
           return null;
         }
 
-        const lng = parseNumericCoordinate(rawCoordinates[0]);
-        const lat = parseNumericCoordinate(rawCoordinates[1]);
+        const lng = parseNumericCoordinate(rawCoordinates[0], -180, 180);
+        const lat = parseNumericCoordinate(rawCoordinates[1], -90, 90);
         if (lat === null || lng === null) {
           return null;
         }

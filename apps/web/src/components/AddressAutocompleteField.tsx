@@ -38,6 +38,13 @@ export function AddressAutocompleteField({
       setActiveIndex(-1);
       return;
     }
+    if (!isFocused) {
+      setOptions([]);
+      setIsOpen(false);
+      setIsLoading(false);
+      setActiveIndex(-1);
+      return;
+    }
 
     const query = value.trim();
     if (query.length < MIN_SEARCH_LENGTH) {

@@ -244,39 +244,40 @@ export function PlanPage() {
         setRouteDetail(response);
         setSelectedRouteId(response.options[0]?.id ?? null);
 
-        if (!isAutoPlannedRoute) {
-          const startOption: GeocodeOption = {
-            label: response.start.label,
-            lat: response.start.lat,
-            lng: response.start.lng
-          };
-          const endOption: GeocodeOption | null = response.end
-            ? {
-                label: response.end.label,
-                lat: response.end.lat,
-                lng: response.end.lng
-              }
-            : null;
-          const end = response.end ?? response.start;
+        const startOption: GeocodeOption = {
+          label: response.start.label,
+          lat: response.start.lat,
+          lng: response.start.lng
+        };
+        const endOption: GeocodeOption | null = response.end
+          ? {
+              label: response.end.label,
+              lat: response.end.lat,
+              lng: response.end.lng
+            }
+          : null;
+        const end = response.end ?? response.start;
 
-          lastAutoPlanSignatureRef.current = computeAutoPlanSignature({
-            startLabel: response.start.label,
-            endLabel: end.label,
-            loopRide: response.loopRide,
-            vehicleType: response.vehicleType,
-            preferences: response.preferences,
-            selectedStartOption: startOption,
-            selectedEndOption: endOption
-          });
+        lastAutoPlanSignatureRef.current = computeAutoPlanSignature({
+          startLabel: response.start.label,
+          endLabel: end.label,
+          loopRide: response.loopRide,
+          vehicleType: response.vehicleType,
+          preferences: response.preferences,
+          selectedStartOption: startOption,
+          selectedEndOption: endOption
+        });
+        setSelectedStartOption(startOption);
+        setSelectedEndOption(endOption);
+
+        if (!isAutoPlannedRoute) {
           setStartLabel(response.start.label);
-          setSelectedStartOption(startOption);
           setLoopRide(response.loopRide);
           setVehicleType(response.vehicleType);
           setPreferences(response.preferences);
           setRoutePreferenceProfile(resolveRoutePreferenceProfile(response.preferences));
 
           setEndLabel(end.label);
-          setSelectedEndOption(endOption);
         }
       })
       .catch((requestError) => {
