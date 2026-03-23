@@ -95,7 +95,7 @@ jobs:
       - name: Docker metadata (main)
         id: meta-main
         if: github.ref == 'refs/heads/main'
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ steps.image.outputs.name }}
           tags: |
@@ -121,7 +121,7 @@ jobs:
       - name: Docker metadata (tag)
         id: meta-tag
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ steps.image.outputs.name }}
           tags: |
