@@ -90,18 +90,26 @@ jobs:
           repo="$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')"
           echo "name=${{ env.REGISTRY }}/${owner}/${repo}-${{ matrix.app }}" >> "$GITHUB_OUTPUT"
 
-      - name: Docker metadata
-        id: meta
+      - name: Docker metadata (main)
+        id: meta-main
+        if: github.ref == 'refs/heads/main'
         uses: docker/metadata-action@v5
         with:
           images: ${{ steps.image.outputs.name }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=branch
-            type=ref,event=tag
+            type=raw,value=develop
             type=sha
+
+      - name: Docker metadata (tag)
+        id: meta-tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=ref,event=tag
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
 
       - name: Build and push image
         uses: docker/build-push-action@v6
@@ -112,8 +120,7 @@ jobs:
           push: true
           provenance: true
           sbom: true
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta-main.outputs.labels || steps.meta-tag.outputs.labels }}
+          tags: ${{ steps.meta-main.outputs.tags || steps.meta-tag.outputs.tags }}
           cache-from: type=gha,scope=${{ matrix.app }}
           cache-to: type=gha,mode=max,scope=${{ matrix.app }}
-
