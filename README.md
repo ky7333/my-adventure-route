@@ -144,7 +144,7 @@ This repository now includes a full GitHub Actions setup:
 - `Containers` (`.github/workflows/containers.yml`)
   - On pull requests: validates Docker builds for `apps/api` and `apps/web`
   - On pushes to `main`: builds and pushes multi-arch images (`linux/amd64`, `linux/arm64`) tagged as `develop`
-  - On version tags (`v*`): builds and pushes multi-arch images tagged with the pushed version and `latest`
+  - On version tags (`v*`): builds and pushes multi-arch images tagged with the pushed version; `latest` is published only when that tag is the highest stable semver tag
   - Publishes:
     - `ghcr.io/<owner>/<repo>-api`
     - `ghcr.io/<owner>/<repo>-web`
@@ -168,7 +168,7 @@ This repository now includes a full GitHub Actions setup:
 
 ### Release notes
 - Releases are tag-driven (`vX.Y.Z`) and do not run on every `main` commit.
-- Container publish on `main` uses `develop`; tag publishes use the version tag and `latest`.
+- Container publish on `main` uses `develop`; tag publishes use the version tag, and `latest` only for the highest stable semver tag.
 
 ## Troubleshooting
 - If GraphHopper fails on startup, ensure `infra/data/osm/vermont-latest.osm.pbf` exists.
