@@ -143,18 +143,16 @@ This repository now includes a full GitHub Actions setup:
 
 - `Containers` (`.github/workflows/containers.yml`)
   - On pull requests: validates Docker builds for `apps/api` and `apps/web`
-  - On `main` and version tags (`v*`): builds and pushes multi-arch images to GHCR (`linux/amd64`, `linux/arm64`)
+  - On pushes to `main`: builds and pushes multi-arch images (`linux/amd64`, `linux/arm64`) tagged as `develop`
+  - On version tags (`v*`): builds and pushes multi-arch images tagged with the pushed version; `latest` is published only when that tag is the highest stable semver tag
   - Publishes:
     - `ghcr.io/<owner>/<repo>-api`
     - `ghcr.io/<owner>/<repo>-web`
   - Adds SBOM/provenance attestation during image publish
 
-- `Release Please` (`.github/workflows/release-please.yml`)
-  - On push to `main`, opens/updates a release PR using Conventional Commits
-  - When the release PR is merged, creates:
-    - a Git tag (`vX.Y.Z`)
-    - a GitHub Release
-    - a `CHANGELOG.md` update
+- `Release` (`.github/workflows/release.yml`)
+  - Runs only on pushed version tags (`v*`)
+  - Creates/updates the GitHub Release for that tag with generated release notes
 
 - `Dependency Review` (`.github/workflows/dependency-review.yml`)
   - Blocks PRs introducing high-severity vulnerable dependencies
@@ -169,8 +167,8 @@ This repository now includes a full GitHub Actions setup:
   - Weekly npm and GitHub Actions dependency update PRs
 
 ### Release notes
-- Release automation is based on Conventional Commit messages (`feat:`, `fix:`, etc.).
-- Container publish on version tags is automatic; `vX.Y.Z` tags produced by Release Please will trigger image publishing.
+- Releases are tag-driven (`vX.Y.Z`) and do not run on every `main` commit.
+- Container publish on `main` uses `develop`; tag publishes use the version tag, and `latest` only for the highest stable semver tag.
 
 ## Troubleshooting
 - If GraphHopper fails on startup, ensure `infra/data/osm/vermont-latest.osm.pbf` exists.
