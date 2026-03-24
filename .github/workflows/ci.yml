@@ -13,6 +13,9 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PNPM_VERSION: 10.32.1
+
 jobs:
   quality:
     name: Lint, Test, Build (Node 20)
@@ -75,4 +78,3 @@ jobs:
 
       - name: Run test suite
         run: pnpm test
-
