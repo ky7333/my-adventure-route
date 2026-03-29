@@ -20,7 +20,7 @@ RUN pnpm --filter @adventure/contracts build \
   && pnpm --filter @adventure/scoring build \
   && pnpm --filter @adventure/api prisma:generate \
   && pnpm --filter @adventure/api build \
-  && pnpm prune --prod
+  && CI=true pnpm prune --prod
 
 FROM node:22-alpine AS runtime
 WORKDIR /app
