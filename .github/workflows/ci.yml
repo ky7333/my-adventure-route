@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PNPM_VERSION: 10.6.2
+  PNPM_VERSION: 10.32.1
 
 jobs:
   quality:
@@ -78,4 +78,3 @@ jobs:
 
       - name: Run test suite
         run: pnpm test
-
