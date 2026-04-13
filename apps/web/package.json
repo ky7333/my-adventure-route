@@ -12,10 +12,10 @@
   },
   "dependencies": {
     "@adventure/contracts": "workspace:*",
-    "maplibre-gl": "^5.2.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-router-dom": "^7.3.0"
+    "maplibre-gl": "^5.23.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "react-router-dom": "^7.14.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
