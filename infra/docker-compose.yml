@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
     container_name: adventure_postgres
     environment:
       POSTGRES_USER: postgres
@@ -17,7 +17,7 @@ services:
       retries: 10
 
   graphhopper:
-    image: israelhikingmap/graphhopper:latest
+    image: israelhikingmap/graphhopper:latest@sha256:0f82b0074d248191097ce22cb43de1a364477f4a1805851beccfdbabd3d360bd
     container_name: adventure_graphhopper
     depends_on:
       postgres:
