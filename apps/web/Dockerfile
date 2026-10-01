@@ -21,7 +21,7 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 RUN pnpm --filter @adventure/contracts build \
   && pnpm --filter @adventure/web build
 
-FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.31-alpine@sha256:26b0bf6fbf07297983cb341998d79c831508787de26627dd2a112321b9c3a4af AS runtime
 WORKDIR /usr/share/nginx/html
 
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
