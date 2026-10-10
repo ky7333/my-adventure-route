@@ -22,9 +22,9 @@
     "@adventure/contracts": "workspace:*"
   },
   "devDependencies": {
-    "eslint": "^9.22.0",
-    "tsup": "^8.4.0",
-    "typescript": "^5.8.2",
-    "vitest": "^3.0.8"
+    "eslint": "9.39.4",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
   }
 }
