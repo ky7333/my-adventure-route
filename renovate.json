@@ -1,67 +1,45 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:best-practices",
-    "group:monorepos"
-  ],
+  "extends": ["config:best-practices", "group:monorepos"],
   "timezone": "America/New_York",
-  "labels": [
-    "dependencies"
-  ],
-  "dependencyDashboard": true,
+  "labels": ["dependencies"],
+  "dependencyDashboard": {
+    "enabled": true
+  },
   "prConcurrentLimit": 8,
   "prHourlyLimit": 2,
   "minimumReleaseAge": "3 days",
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": [
-      "before 5am on monday"
-    ]
+    "schedule": ["before 5am on monday"]
   },
   "packageRules": [
     {
       "description": "Group non-major npm updates to reduce PR noise in the monorepo",
-      "matchManagers": [
-        "npm"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"],
       "groupName": "npm non-major dependencies"
     },
     {
       "description": "Keep GitHub Actions updates in a single PR",
-      "matchManagers": [
-        "github-actions"
-      ],
+      "matchManagers": ["github-actions"],
       "groupName": "github-actions"
     },
     {
       "description": "Automerge safe digest updates for Docker images after CI passes",
-      "matchManagers": [
-        "dockerfile"
-      ],
-      "matchUpdateTypes": [
-        "digest"
-      ],
+      "matchManagers": ["dockerfile"],
+      "matchUpdateTypes": ["digest"],
       "automerge": true
     },
     {
       "description": "Automerge safe digest updates for GitHub Actions after CI passes",
-      "matchManagers": [
-        "github-actions"
-      ],
-      "matchUpdateTypes": [
-        "digest"
-      ],
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest"],
       "automerge": true
     },
     {
       "description": "Require manual approval for major updates",
-      "matchUpdateTypes": [
-        "major"
-      ],
+      "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true
     }
   ]
