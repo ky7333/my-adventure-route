@@ -1,6 +1,6 @@
-# syntax=docker/dockerfile:1.22
+# syntax=docker/dockerfile:1.22@sha256:4a43a54dd1fedceb30ba47e76cfcf2b47304f4161c0caeac2db1c61804ea3c91
 
-FROM node:22-alpine AS base
+FROM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -22,7 +22,7 @@ RUN pnpm --filter @adventure/contracts build \
   && pnpm --filter @adventure/api build \
   && pnpm prune --prod
 
-FROM node:22-alpine AS runtime
+FROM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001

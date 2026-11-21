@@ -17,7 +17,7 @@ services:
       retries: 10
 
   graphhopper:
-    image: israelhikingmap/graphhopper:latest
+    image: israelhikingmap/graphhopper:latest@sha256:589e8ab6d5c25b0409cd89a8cf7fb2fb497518d03f673d762b71f3499251b651
     container_name: adventure_graphhopper
     depends_on:
       postgres:
